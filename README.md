@@ -1,0 +1,136 @@
+# Mis Finanzas API
+
+API REST para el control de finanzas personales construida con **Quarkus 3.21**, **Java 21** y **PostgreSQL 16**.
+
+## Arquitectura
+
+```
+pe.suarez.finanzas/
+├── domain/         → Entidades JPA (Panache) + enums
+├── repository/     → PanacheRepository por entidad
+├── service/        → Lógica de negocio (@ApplicationScoped, @Transactional)
+├── dto/            → Records de Java 21 para request/response
+├── mapper/         → Mappers manuales entity ↔ DTO
+├── resource/       → JAX-RS resources
+├── exception/      → ExceptionMapper global (RFC 7807)
+└── security/       → UserContext (extrae userId del JWT) + JwtIssuer
+```
+
+## Requisitos previos
+
+- JDK 21+
+- Maven 3.9+
+- Docker (para PostgreSQL local)
+- OpenSSL (para generar las llaves JWT)
+
+## Setup paso a paso
+
+### 1. Levantar PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+### 2. Generar llaves JWT (RS256)
+
+Las llaves son **únicas por entorno** y nunca se commitean. Genera tu par localmente:
+
+```bash
+# Llave privada (firma tokens)
+openssl genrsa -out privateKey.pem 2048
+
+# Convertir a PKCS#8 (formato que requiere SmallRye JWT)
+openssl pkcs8 -topk8 -inform PEM -in privateKey.pem -out privateKey-pkcs8.pem -nocrypt
+mv privateKey-pkcs8.pem privateKey.pem
+
+# Llave pública (verifica tokens)
+openssl rsa -in privateKey.pem -pubout -outform PEM -out publicKey.pem
+```
+
+Las llaves quedan en la raíz del proyecto. Ya están ignoradas en `.gitignore`.
+
+### 3. Correr la aplicación
+
+```bash
+./mvnw quarkus:dev
+```
+
+Quarkus arrancará con:
+- API en http://localhost:8080
+- Swagger UI en http://localhost:8080/q/swagger-ui
+- Dev UI en http://localhost:8080/q/dev
+
+Flyway aplicará las migraciones automáticamente.
+
+## Endpoints principales
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/auth/register` | Registra un usuario y siembra categorías + reglas plantilla |
+| `POST` | `/api/auth/login` | Devuelve JWT |
+| `GET` | `/api/auth/me` | Datos del usuario autenticado |
+| `GET` | `/api/categories` | Lista categorías del usuario |
+| `POST` | `/api/categories` | Crea categoría personalizada |
+| `PUT/DELETE` | `/api/categories/{id}` | Actualiza/archiva |
+| `GET` | `/api/transactions?period=2026-04&page=0&size=20` | Movimientos del mes |
+| `POST/PUT/DELETE` | `/api/transactions[/{id}]` | CRUD de movimientos |
+| `GET` | `/api/allocation-rules` | Reglas de asignación (incluye 50/30/20, 70/20/10, Kakebo) |
+| `POST/PUT/DELETE` | `/api/allocation-rules[/{id}]` | CRUD de reglas |
+| `GET` | `/api/budgets?period=2026-04` | Presupuesto del mes |
+| `POST` | `/api/budgets` | Upsert presupuesto del mes |
+| `GET` | `/api/dashboard?period=2026-04` | **Resumen completo del panel principal** |
+
+## Decisiones de diseño
+
+**Multi-tenant desde el inicio.** Todas las entidades llevan `userId` plano (no FK relación) y todas las queries filtran por `userContext.userId()`. El `userId` viene del claim `uid` del JWT.
+
+**Montos en `BigDecimal(14,2)`.** Nunca `double` o `float` para dinero. Soporta hasta `999,999,999,999.99`.
+
+**Reglas de asignación con JSONB.** El campo `percentages` es un mapa `bucket → %` flexible. Permite cualquier metodología (50/30/20, 70/20/10, Kakebo, custom) sin cambiar el schema. Los buckets son un enum (`AllocationBucket`).
+
+**Categorías ↔ Buckets.** Cada categoría tiene un `defaultBucket`. Las transacciones heredan el bucket de su categoría al agregarse en el dashboard. Esto evita duplicar lógica de clasificación en cada movimiento.
+
+**Index crítico:** `(user_id, transaction_date DESC)` en `transactions`. Es la query más frecuente.
+
+**Errors en RFC 7807.** Las respuestas de error usan `application/problem+json` con `type/title/status/detail/timestamp`. Para validaciones se incluye un array `errors` con `field` y `message`.
+
+## Variables de entorno
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `DB_URL` | `jdbc:postgresql://localhost:5432/misfinanzas` | JDBC URL |
+| `DB_USER` | `finanzas` | Usuario de DB |
+| `DB_PASSWORD` | `finanzas` | Password de DB |
+| `JWT_PUBLIC_KEY_LOCATION` | `publicKey.pem` | Ruta a llave pública |
+| `JWT_PRIVATE_KEY_LOCATION` | `privateKey.pem` | Ruta a llave privada |
+| `JWT_ISSUER` | `https://mis-finanzas.suarez.pe` | Issuer del JWT |
+| `LOG_SQL` | `false` | Activa logging de SQL |
+
+## Tests
+
+```bash
+./mvnw test
+```
+
+Los tests usan `@QuarkusTest` con `quarkus-test-security-jwt` para inyectar JWTs simulados.
+
+## Build
+
+```bash
+# Jar runner
+./mvnw package
+
+# Ejecutar
+java -jar target/quarkus-app/quarkus-run.jar
+
+# Imagen nativa (requiere GraalVM o Mandrel)
+./mvnw package -Dnative
+```
+
+## Próximos pasos sugeridos
+
+1. **Frontend** React + TypeScript + Vite + PWA consumiendo esta API.
+2. **Importador CSV** de movimientos bancarios (BCP, Interbank).
+3. **Recurrencias** (suscripciones, sueldos) — nueva tabla + scheduler.
+4. **Reportes históricos** mes vs mes / año vs año.
+5. **Multi-currency** con tipo de cambio diario.

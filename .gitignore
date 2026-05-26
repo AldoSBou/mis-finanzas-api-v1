@@ -1,0 +1,31 @@
+# Build
+target/
+build/
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+*.iws
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Quarkus
+.quarkus/
+quarkus.log
+
+# Llaves JWT (NO COMMITEAR)
+*.pem
+publicKey.pem
+privateKey.pem
+
+# Variables de entorno locales
+.env
+.env.local
