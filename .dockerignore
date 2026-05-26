@@ -1,0 +1,24 @@
+# No copiar al contexto de build de Docker
+target/
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+
+# CRÍTICO: nunca incluir llaves en la imagen
+*.pem
+privateKey.*
+publicKey.*
+
+# Docs y archivos de desarrollo
+*.md
+docker-compose.yml
+.env
+.env.*
+.dockerignore
+Dockerfile
+
+# Logs y temporales
+*.log
+.DS_Store

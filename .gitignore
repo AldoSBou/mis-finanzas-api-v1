@@ -1,31 +1,35 @@
-# Build
+# ===== Compilados =====
 target/
-build/
-*.jar
-*.war
+*.class
 
-# IDE
+# ===== CRÍTICO: secretos y llaves =====
+# Las llaves JWT NUNCA deben subirse al repositorio.
+# En producción van como variables de entorno (ver DEPLOY.md).
+*.pem
+privateKey.*
+publicKey.*
+.env
+.env.local
+.env.*.local
+
+# ===== IDE =====
 .idea/
-*.iml
-*.iws
 .vscode/
+*.iml
 .project
 .classpath
 .settings/
 
-# OS
+# ===== Maven =====
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ===== Quarkus =====
+.quarkus/
+
+# ===== OS =====
 .DS_Store
 Thumbs.db
 
-# Quarkus
-.quarkus/
-quarkus.log
-
-# Llaves JWT (NO COMMITEAR)
-*.pem
-publicKey.pem
-privateKey.pem
-
-# Variables de entorno locales
-.env
-.env.local
+# ===== Logs =====
+*.log
