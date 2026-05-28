@@ -39,6 +39,10 @@ COPY --from=build /build/target/quarkus-app/quarkus/  ./quarkus/
 COPY --chown=quarkus:quarkus entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
+# Crear la carpeta de llaves y darle ownership al usuario quarkus
+# (el entrypoint necesita escribir aquí, y corremos como no-root)
+RUN mkdir -p /app/keys && chown -R quarkus:quarkus /app
+
 EXPOSE 8080
 
 USER quarkus
