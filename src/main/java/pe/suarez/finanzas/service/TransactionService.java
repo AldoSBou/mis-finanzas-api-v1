@@ -23,6 +23,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,9 +38,56 @@ public class TransactionService {
     @Inject AccountRepository accountRepo;
     @Inject UserContext userContext;
 
-    public TransactionPage listForMonth(YearMonth ym, Long accountId, int page, int size) {
+    public TransactionPage search(TransactionFilter filter, int page, int size) {
         Long uid = userContext.userId();
-        var transactions = txRepo.listForMonth(uid, ym, accountId, page, size);
+        var transactions = txRepo.search(uid, filter, page, size);
+        long total = txRepo.count(uid, filter);
+        return new TransactionPage(toResponses(transactions, uid), total, page, size);
+    }
+
+    /** CSV (UTF-8 con BOM, para que Excel muestre bien las tildes) con los movimientos filtrados. */
+    public String exportCsv(TransactionFilter filter) {
+        Long uid = userContext.userId();
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        csv.append("fecha,tipo,cuenta,cuenta_destino,categoria,descripcion,monto,moneda,"
+                + "monto_recibido,moneda_destino,tipo_cambio,monto_moneda_base,recurrente\r\n");
+        for (TransactionResponse t : toResponses(txRepo.searchAll(uid, filter), uid)) {
+            csv.append(String.join(",",
+                    t.transactionDate().toString(),
+                    TYPE_LABELS.get(t.type()),
+                    csvText(t.accountName()),
+                    csvText(t.toAccountName()),
+                    csvText(t.categoryName()),
+                    csvText(t.description()),
+                    t.amount().toPlainString(),
+                    t.currency(),
+                    t.toAmount() != null ? t.toAmount().toPlainString() : "",
+                    t.toCurrency() != null ? t.toCurrency() : "",
+                    t.exchangeRate().stripTrailingZeros().toPlainString(),
+                    t.amountBase().toPlainString(),
+                    t.recurringId() != null ? "si" : "no"));
+            csv.append("\r\n");
+        }
+        return csv.toString();
+    }
+
+    private static final Map<TransactionType, String> TYPE_LABELS = Map.of(
+            TransactionType.INCOME, "ingreso",
+            TransactionType.EXPENSE, "gasto",
+            TransactionType.TRANSFER, "transferencia");
+
+    /** Texto CSV: entre comillas si hace falta; evita que Excel interprete fórmulas (=, +, -, @). */
+    private static String csvText(String value) {
+        if (value == null || value.isEmpty()) return "";
+        String v = value;
+        if ("=+-@".indexOf(v.charAt(0)) >= 0) v = "'" + v;
+        if (v.contains(",") || v.contains("\"") || v.contains("\n") || v.contains("\r") || !v.equals(value)) {
+            v = "\"" + v.replace("\"", "\"\"") + "\"";
+        }
+        return v;
+    }
+
+    private List<TransactionResponse> toResponses(List<Transaction> transactions, Long uid) {
 
         var catIds = transactions.stream().map(t -> t.categoryId).filter(Objects::nonNull).distinct().toList();
         Map<Long, Category> catsById = catIds.isEmpty()
@@ -52,15 +100,12 @@ public class TransactionService {
                 .filter(Objects::nonNull).distinct().toList();
         Map<Long, Account> accountsById = accountRepo.mapByIds(accountIds, uid);
 
-        var items = transactions.stream()
+        return transactions.stream()
                 .map(t -> Mappers.toTransactionResponse(t,
                         t.categoryId != null ? catsById.get(t.categoryId) : null,
                         accountsById.get(t.accountId),
                         t.toAccountId != null ? accountsById.get(t.toAccountId) : null))
                 .toList();
-
-        long total = txRepo.countForMonth(uid, ym, accountId);
-        return new TransactionPage(items, total, page, size);
     }
 
     public TransactionResponse get(Long id) {

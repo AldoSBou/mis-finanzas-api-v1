@@ -75,8 +75,16 @@ Flyway aplicará las migraciones automáticamente.
 | `GET` | `/api/accounts` | Cuentas con su saldo actual |
 | `POST/PUT/DELETE` | `/api/accounts[/{id}]` | Crea/actualiza/archiva cuentas |
 | `GET` | `/api/transactions?period=2026-04&accountId=3&page=0&size=20` | Movimientos del mes (opcional: de una cuenta) |
+| `GET` | `/api/transactions?from=2025-01-01&to=2026-12-31&q=soat&type=EXPENSE&categoryId=5` | Búsqueda con filtros (texto, tipo, categoría, cuenta, montos) |
+| `GET` | `/api/transactions/export?...` | Mismos filtros, descarga CSV (UTF-8 con BOM para Excel) |
 | `POST/PUT/DELETE` | `/api/transactions[/{id}]` | CRUD de ingresos, gastos y transferencias |
 | `GET` | `/api/transactions/exchange-rate?currency=USD` | Último tipo de cambio usado (204 si ninguno) |
+| `GET/POST` | `/api/recurring` | Recurrentes (semanal, mensual, anual; automáticos o con confirmación) |
+| `PUT/DELETE` | `/api/recurring/{id}` | Editar / eliminar recurrente |
+| `POST` | `/api/recurring/{id}/register` · `/skip` | Registrar (monto real) u omitir la ocurrencia pendiente |
+| `GET` | `/api/category-budgets?period=2026-09` | Límite, gastado y programado por categoría |
+| `PUT/DELETE` | `/api/category-budgets/{categoryId}` | Definir / quitar límite mensual |
+| `GET` | `/api/reports?until=2026-09&months=12` | Ingresos, gastos, ahorro, patrimonio y gasto por categoría por mes |
 | `GET` | `/api/allocation-rules` | Reglas de asignación (incluye 50/30/20, 70/20/10, Kakebo) |
 | `POST/PUT/DELETE` | `/api/allocation-rules[/{id}]` | CRUD de reglas |
 | `GET` | `/api/budgets?period=2026-04` | Presupuesto del mes |
@@ -96,6 +104,10 @@ Flyway aplicará las migraciones automáticamente.
 **Multi-moneda.** La moneda es la de la cuenta. Cada movimiento guarda `exchange_rate` y `amount_base` (monto en la moneda base del usuario). Los reportes suman solo `amount_base`. En transferencias hacia la moneda base el tipo de cambio sale de los montos (100 USD → 372 PEN = 3.72); en otros casos el cliente lo envía.
 
 **Dashboard.** `expenses` es consumo (sin categorías de ahorro/inversión), `savings` es ahorro neto del mes y `balance = income − expenses − savings`.
+
+**Recurrentes sin cron.** En Railway Free el backend se duerme, así que una tarea programada no correría. Las ocurrencias automáticas vencidas se registran al abrir la app (dashboard, movimientos, cuentas, reportes), con `SELECT ... FOR UPDATE` para no duplicar cuando varias pantallas cargan a la vez. Los de confirmación manual quedan como pendientes en el dashboard.
+
+**Presupuesto por categoría.** Límite mensual en moneda base, igual para todos los meses. Estado OK / WARNING (80%) / OVER (100%) sobre lo gastado; `willExceed` avisa si lo programado en recurrentes hará pasar el límite.
 
 **Categorías ↔ Buckets.** Cada categoría tiene un `defaultBucket`. Las transacciones heredan el bucket de su categoría al agregarse en el dashboard. Esto evita duplicar lógica de clasificación en cada movimiento.
 
@@ -140,8 +152,8 @@ java -jar target/quarkus-app/quarkus-run.jar
 
 ## Próximos pasos sugeridos
 
-1. **Frontend** React + TypeScript + Vite + PWA consumiendo esta API.
-2. **Importador CSV** de movimientos bancarios (BCP, Interbank).
-3. **Recurrencias** (suscripciones, sueldos) — nueva tabla + scheduler.
-4. **Reportes históricos** mes vs mes / año vs año.
+1. **Importador CSV** de estados de cuenta (BCP, Interbank) con reglas de categorización.
+2. **Metas de ahorro** con progreso.
+3. **Tarjetas de crédito**: fecha de corte y pago, compras en cuotas.
+4. **Registro sin conexión** (cola local en la PWA).
 5. **Tipo de cambio automático** (SUNAT/SBS) para prellenar movimientos en otra moneda.

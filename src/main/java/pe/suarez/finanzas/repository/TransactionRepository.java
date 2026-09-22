@@ -9,6 +9,7 @@ import jakarta.inject.Inject;
 import pe.suarez.finanzas.domain.AllocationBucket;
 import pe.suarez.finanzas.domain.Transaction;
 import pe.suarez.finanzas.domain.TransactionType;
+import pe.suarez.finanzas.dto.TransactionDtos.TransactionFilter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,30 +36,59 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
         return find("id = ?1 AND userId = ?2", id, userId).firstResultOptional();
     }
 
-    private record Filter(String query, Object[] params) {}
+    private record Query(String text, Map<String, Object> params) {}
 
-    /** Movimientos del mes; si {@code accountId} no es null, solo los que tocan esa cuenta. */
-    private Filter monthFilter(Long userId, YearMonth ym, Long accountId) {
-        String q = "userId = ?1 AND transactionDate BETWEEN ?2 AND ?3";
-        if (accountId == null) {
-            return new Filter(q, new Object[]{userId, ym.atDay(1), ym.atEndOfMonth()});
+    private static final Sort NEWEST_FIRST =
+            Sort.by("transactionDate").descending().and("id", Sort.Direction.Descending);
+
+    /** Arma la consulta con los filtros no nulos (todos se combinan con AND). */
+    private static Query where(Long userId, TransactionFilter f) {
+        StringBuilder q = new StringBuilder("userId = :uid AND transactionDate BETWEEN :from AND :to");
+        Map<String, Object> p = new HashMap<>();
+        p.put("uid", userId);
+        p.put("from", f.from());
+        p.put("to", f.to());
+        if (f.accountId() != null) {
+            q.append(" AND (accountId = :account OR toAccountId = :account)");
+            p.put("account", f.accountId());
         }
-        return new Filter(q + " AND (accountId = ?4 OR toAccountId = ?4)",
-                new Object[]{userId, ym.atDay(1), ym.atEndOfMonth(), accountId});
+        if (f.categoryId() != null) {
+            q.append(" AND categoryId = :category");
+            p.put("category", f.categoryId());
+        }
+        if (f.type() != null) {
+            q.append(" AND type = :type");
+            p.put("type", f.type());
+        }
+        if (f.text() != null && !f.text().isBlank()) {
+            q.append(" AND lower(description) LIKE :text");
+            p.put("text", "%" + f.text().trim().toLowerCase() + "%");
+        }
+        if (f.minAmount() != null) {
+            q.append(" AND amount >= :min");
+            p.put("min", f.minAmount());
+        }
+        if (f.maxAmount() != null) {
+            q.append(" AND amount <= :max");
+            p.put("max", f.maxAmount());
+        }
+        return new Query(q.toString(), p);
     }
 
-    public List<Transaction> listForMonth(Long userId, YearMonth ym, Long accountId, int page, int size) {
-        Filter f = monthFilter(userId, ym, accountId);
-        return find(f.query(),
-                Sort.by("transactionDate").descending().and("id", Sort.Direction.Descending),
-                f.params())
-                .page(Page.of(page, size))
-                .list();
+    public List<Transaction> search(Long userId, TransactionFilter f, int page, int size) {
+        Query q = where(userId, f);
+        return find(q.text(), NEWEST_FIRST, q.params()).page(Page.of(page, size)).list();
     }
 
-    public long countForMonth(Long userId, YearMonth ym, Long accountId) {
-        Filter f = monthFilter(userId, ym, accountId);
-        return count(f.query(), f.params());
+    public long count(Long userId, TransactionFilter f) {
+        Query q = where(userId, f);
+        return count(q.text(), q.params());
+    }
+
+    /** Todos los resultados (para exportar), del más reciente al más antiguo. */
+    public List<Transaction> searchAll(Long userId, TransactionFilter f) {
+        Query q = where(userId, f);
+        return find(q.text(), NEWEST_FIRST, q.params()).list();
     }
 
     /** Suma de ingresos en el rango. Devuelve ZERO si no hay registros. */

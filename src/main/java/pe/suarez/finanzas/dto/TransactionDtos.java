@@ -64,6 +64,21 @@ public final class TransactionDtos {
             int size
     ) {}
 
+    /**
+     * Filtros de búsqueda; los null no filtran. El rango de fechas siempre está definido
+     * (por defecto, el mes actual). {@code text} busca en la descripción.
+     */
+    public record TransactionFilter(
+            LocalDate from,
+            LocalDate to,
+            Long accountId,
+            Long categoryId,
+            TransactionType type,
+            String text,
+            BigDecimal minAmount,
+            BigDecimal maxAmount
+    ) {}
+
     /** Último tipo de cambio que el usuario usó para una moneda (para prellenar formularios). */
     public record ExchangeRateResponse(
             String currency,
