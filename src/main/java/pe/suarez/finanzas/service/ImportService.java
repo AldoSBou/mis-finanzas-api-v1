@@ -65,7 +65,7 @@ public class ImportService {
         for (int i = 0; i < req.rows().size(); i++) {
             CommitRow row = req.rows().get(i);
             try {
-                Transaction t = txService.createFromImport(requestFor(account.id, row, req.exchangeRate()), uid);
+                Transaction t = txService.createWithinTransaction(requestFor(account.id, row, req.exchangeRate()), uid);
                 t.importBatchId = batch.id;
             } catch (ApiException e) {
                 throw new ApiException(e.code(), "Fila " + (i + 1) + ": " + e.getMessage());

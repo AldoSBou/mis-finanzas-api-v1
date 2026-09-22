@@ -6,6 +6,7 @@ import jakarta.transaction.Transactional;
 import pe.suarez.finanzas.api.ErrorCode;
 import pe.suarez.finanzas.domain.Account;
 import pe.suarez.finanzas.domain.Category;
+import pe.suarez.finanzas.domain.GoalContribution;
 import pe.suarez.finanzas.domain.RecurringTransaction;
 import pe.suarez.finanzas.domain.Transaction;
 import pe.suarez.finanzas.domain.TransactionType;
@@ -129,7 +130,13 @@ public class TransactionService {
     @Transactional
     public TransactionResponse update(Long id, TransactionRequest req) {
         Transaction t = findTx(id, userContext.userId());
-        return apply(t, req);
+        TransactionResponse resp = apply(t, req);
+        // Si es la transferencia de un aporte a una meta, el aporte sigue al movimiento
+        for (GoalContribution c : GoalContribution.<GoalContribution>list("transactionId", t.id)) {
+            c.amount = c.amount.signum() < 0 ? t.amount.negate() : t.amount;
+            c.contributionDate = t.transactionDate;
+        }
+        return resp;
     }
 
     @Transactional
@@ -183,10 +190,10 @@ public class TransactionService {
     }
 
     /**
-     * Crea un movimiento importado. Como {@link #createFromRecurring}, sin
-     * {@code @Transactional}: la importación completa es una sola transacción.
+     * Crea un movimiento dentro de la transacción del llamador (importaciones, aportes a metas).
+     * Como {@link #createFromRecurring}, sin {@code @Transactional} a propósito.
      */
-    public Transaction createFromImport(TransactionRequest req, Long uid) {
+    public Transaction createWithinTransaction(TransactionRequest req, Long uid) {
         Transaction t = new Transaction();
         t.userId = uid;
         apply(t, req);

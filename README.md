@@ -88,6 +88,9 @@ Flyway aplicará las migraciones automáticamente.
 | `POST/GET` | `/api/imports` | Importar filas confirmadas (todo o nada) / importaciones recientes |
 | `DELETE` | `/api/imports/{id}` | Deshacer una importación |
 | `GET/POST/PUT/DELETE` | `/api/categorization-rules[/{id}]` | Reglas "si la descripción contiene X → categoría" |
+| `GET/POST` | `/api/goals` | Metas de ahorro con progreso y saldo sin asignar por cuenta |
+| `PUT/DELETE` | `/api/goals/{id}` | Editar / eliminar meta |
+| `GET/POST/DELETE` | `/api/goals/{id}/contributions[/{cid}]` | Aportes y retiros (con o sin transferencia) |
 | `GET` | `/api/reports?until=2026-09&months=12` | Ingresos, gastos, ahorro, patrimonio y gasto por categoría por mes |
 | `GET` | `/api/allocation-rules` | Reglas de asignación (incluye 50/30/20, 70/20/10, Kakebo) |
 | `POST/PUT/DELETE` | `/api/allocation-rules[/{id}]` | CRUD de reglas |
@@ -158,7 +161,6 @@ java -jar target/quarkus-app/quarkus-run.jar
 
 ## Próximos pasos sugeridos
 
-1. **Metas de ahorro** con progreso.
-2. **Tarjetas de crédito**: fecha de corte y pago, compras en cuotas.
-3. **Registro sin conexión** (cola local en la PWA).
-4. **Tipo de cambio automático** (SUNAT/SBS) para prellenar movimientos en otra moneda.
+1. **Tarjetas de crédito**: fecha de corte y pago, compras en cuotas.
+2. **Registro sin conexión** (cola local en la PWA).
+3. **Tipo de cambio automático** (SUNAT/SBS) para prellenar movimientos en otra moneda.

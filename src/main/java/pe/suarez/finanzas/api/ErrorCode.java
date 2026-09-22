@@ -44,6 +44,10 @@ public enum ErrorCode {
     RECURRING_NOT_FOUND(404),
     RECURRING_INACTIVE(400),
 
+    // Metas
+    GOAL_NOT_FOUND(404),
+    GOAL_INVALID(400),
+
     // Reglas
     RULE_NOT_FOUND(404),
     RULE_TEMPLATE_LOCKED(400),

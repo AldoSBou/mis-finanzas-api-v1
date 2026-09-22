@@ -118,6 +118,14 @@ public final class ErrorCatalog {
                 "El recurrente está pausado o terminó",
                 "Reactívalo o ajusta su fecha de fin para registrar nuevas ocurrencias.");
 
+        // Metas
+        register(ErrorCode.GOAL_NOT_FOUND,
+                "Meta no encontrada",
+                "La meta especificada no existe o no pertenece al usuario actual.");
+        register(ErrorCode.GOAL_INVALID,
+                "Operación no válida para la meta",
+                "Revisa el detalle: monto, cuenta o saldo disponible.");
+
         // Reglas
         register(ErrorCode.RULE_NOT_FOUND,
                 "Regla de asignación no encontrada",
