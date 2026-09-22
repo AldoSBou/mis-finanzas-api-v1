@@ -20,15 +20,15 @@ class AuthResourceTest {
                 .body("""
                         {
                           "email": "test@suarez.pe",
-                          "password": "miclave123",
+                          "password": "Una-clave-larga-2026",
                           "displayName": "Test User"
                         }
                         """)
                 .when().post("/api/auth/register")
                 .then().statusCode(201)
-                .body("token", notNullValue())
-                .body("user.email", equalTo("test@suarez.pe"))
-                .body("user.currencyDefault", equalTo("PEN"));
+                .body("data.token", notNullValue())
+                .body("data.user.email", equalTo("test@suarez.pe"))
+                .body("data.user.currencyDefault", equalTo("PEN"));
 
         // Login
         given()
@@ -36,12 +36,12 @@ class AuthResourceTest {
                 .body("""
                         {
                           "email": "test@suarez.pe",
-                          "password": "miclave123"
+                          "password": "Una-clave-larga-2026"
                         }
                         """)
                 .when().post("/api/auth/login")
                 .then().statusCode(200)
-                .body("token", notNullValue());
+                .body("data.token", notNullValue());
     }
 
     @Test
