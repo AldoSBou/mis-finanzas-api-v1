@@ -97,7 +97,7 @@ public class DashboardService {
     }
 
     /** Gastos por bucket + aportes netos de transferencias a cuentas de ahorro/inversión. */
-    private Map<AllocationBucket, BigDecimal> bucketTotals(Long uid, LocalDate from, LocalDate to) {
+    Map<AllocationBucket, BigDecimal> bucketTotals(Long uid, LocalDate from, LocalDate to) {
         Map<AllocationBucket, BigDecimal> totals = new EnumMap<>(AllocationBucket.class);
         for (Object[] row : txRepo.sumExpensesByBucket(uid, from, to)) {
             AllocationBucket b = row[0] != null ? (AllocationBucket) row[0] : AllocationBucket.UNCATEGORIZED;
@@ -114,7 +114,7 @@ public class DashboardService {
         return totals;
     }
 
-    private static BigDecimal sum(Map<AllocationBucket, BigDecimal> totals, boolean savingsBuckets) {
+    static BigDecimal sum(Map<AllocationBucket, BigDecimal> totals, boolean savingsBuckets) {
         return totals.entrySet().stream()
                 .filter(e -> SAVINGS_BUCKETS.contains(e.getKey()) == savingsBuckets)
                 .map(Map.Entry::getValue)

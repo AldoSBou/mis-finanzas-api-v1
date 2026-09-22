@@ -7,6 +7,7 @@ import jakarta.persistence.EntityManager;
 import pe.suarez.finanzas.domain.Account;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,11 @@ public class AccountRepository implements PanacheRepository<Account> {
      * suman {@code to_amount}.
      */
     public Map<Long, BigDecimal> movementTotals(Long userId) {
+        return movementTotals(userId, LocalDate.of(9999, 12, 31));
+    }
+
+    /** Igual que {@link #movementTotals(Long)}, contando solo movimientos hasta {@code upTo} inclusive. */
+    public Map<Long, BigDecimal> movementTotals(Long userId, LocalDate upTo) {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = em.createNativeQuery("""
                         SELECT m.account_id, SUM(m.delta)
@@ -49,15 +55,16 @@ public class AccountRepository implements PanacheRepository<Account> {
                             SELECT account_id,
                                    CASE WHEN type = 'INCOME' THEN amount ELSE -amount END AS delta
                             FROM transactions
-                            WHERE user_id = :uid
+                            WHERE user_id = :uid AND transaction_date <= :upTo
                             UNION ALL
                             SELECT to_account_id, to_amount
                             FROM transactions
-                            WHERE user_id = :uid AND type = 'TRANSFER'
+                            WHERE user_id = :uid AND type = 'TRANSFER' AND transaction_date <= :upTo
                         ) m
                         GROUP BY m.account_id
                         """)
                 .setParameter("uid", userId)
+                .setParameter("upTo", upTo)
                 .getResultList();
         Map<Long, BigDecimal> result = new HashMap<>();
         for (Object[] row : rows) {
