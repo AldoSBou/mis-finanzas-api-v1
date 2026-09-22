@@ -41,6 +41,7 @@ public class DashboardService {
     @Inject AllocationRuleRepository ruleRepo;
     @Inject UserContext userContext;
     @Inject RecurringService recurringService;
+    @Inject CategoryBudgetService categoryBudgetService;
 
     public DashboardResponse build(YearMonth ym) {
         Long uid = userContext.userId();
@@ -90,7 +91,8 @@ public class DashboardService {
                 bucketSummaries,
                 topCategories,
                 upcoming,
-                projectedBalance
+                projectedBalance,
+                categoryBudgetService.alerts(ym)
         );
     }
 

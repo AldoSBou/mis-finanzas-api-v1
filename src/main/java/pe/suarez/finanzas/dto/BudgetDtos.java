@@ -2,6 +2,7 @@ package pe.suarez.finanzas.dto;
 
 import jakarta.validation.constraints.*;
 import pe.suarez.finanzas.domain.AllocationBucket;
+import pe.suarez.finanzas.dto.CategoryBudgetDtos.CategoryBudgetItem;
 import pe.suarez.finanzas.dto.RecurringDtos.UpcomingItem;
 
 import java.math.BigDecimal;
@@ -77,6 +78,8 @@ public final class BudgetDtos {
             /** Solo en el mes actual: recurrentes pendientes y por venir hasta fin de mes */
             List<UpcomingItem> upcoming,
             /** Solo en el mes actual: balance + efecto de los recurrentes por venir */
-            BigDecimal projectedBalance
+            BigDecimal projectedBalance,
+            /** Categorías con límite al 80% o más, o que se pasarán con lo programado */
+            List<CategoryBudgetItem> budgetAlerts
     ) {}
 }

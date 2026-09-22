@@ -13,7 +13,9 @@ import pe.suarez.finanzas.domain.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -98,6 +100,26 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
                 .setParameter("from", from)
                 .setParameter("to", to)
                 .getResultList();
+    }
+
+    /** Gastos del rango por categoría (todas las de gasto), en moneda base. */
+    public Map<Long, BigDecimal> sumExpensesByCategory(Long userId, LocalDate from, LocalDate to) {
+        Map<Long, BigDecimal> result = new HashMap<>();
+        em.createQuery("""
+                        SELECT t.categoryId, COALESCE(SUM(t.amountBase), 0)
+                        FROM Transaction t
+                        WHERE t.userId = :uid
+                          AND t.type = :type
+                          AND t.transactionDate BETWEEN :from AND :to
+                        GROUP BY t.categoryId
+                        """, Object[].class)
+                .setParameter("uid", userId)
+                .setParameter("type", TransactionType.EXPENSE)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList()
+                .forEach(row -> result.put((Long) row[0], (BigDecimal) row[1]));
+        return result;
     }
 
     /**

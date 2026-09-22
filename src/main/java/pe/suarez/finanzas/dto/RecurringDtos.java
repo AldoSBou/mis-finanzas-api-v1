@@ -64,6 +64,7 @@ public final class RecurringDtos {
     public record UpcomingItem(
             Long recurringId,
             TransactionType type,
+            Long categoryId,
             String description,
             String categoryName,
             String accountName,

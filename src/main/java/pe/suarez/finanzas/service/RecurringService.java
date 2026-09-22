@@ -130,7 +130,7 @@ public class RecurringService {
             LocalDate d = r.nextDate;
             for (int n = 0; n < MAX_UPCOMING && !d.isAfter(until)
                     && (r.endDate == null || !d.isAfter(r.endDate)); n++) {
-                items.add(new UpcomingItem(r.id, r.type, r.description,
+                items.add(new UpcomingItem(r.id, r.type, r.categoryId, r.description,
                         c != null ? c.name : null,
                         from != null ? from.name : null,
                         to != null ? to.name : null,
