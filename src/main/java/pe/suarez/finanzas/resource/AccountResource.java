@@ -9,6 +9,7 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import pe.suarez.finanzas.dto.AccountDtos.*;
 import pe.suarez.finanzas.service.AccountService;
+import pe.suarez.finanzas.service.RecurringService;
 
 import java.util.List;
 
@@ -20,9 +21,11 @@ import java.util.List;
 public class AccountResource {
 
     @Inject AccountService service;
+    @Inject RecurringService recurringService;
 
     @GET
     public List<AccountResponse> list(@QueryParam("includeArchived") @DefaultValue("false") boolean includeArchived) {
+        recurringService.materializeDue();
         return service.listAll(includeArchived);
     }
 

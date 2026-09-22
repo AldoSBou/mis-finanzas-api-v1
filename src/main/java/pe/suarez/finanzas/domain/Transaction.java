@@ -62,6 +62,10 @@ public class Transaction extends PanacheEntityBase {
     @Column(length = 200)
     public String description;
 
+    /** Recurrente que generó este movimiento, si aplica. */
+    @Column(name = "recurring_id")
+    public Long recurringId;
+
     @Column(name = "payment_method", length = 40)
     public String paymentMethod;
 

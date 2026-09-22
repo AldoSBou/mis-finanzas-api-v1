@@ -46,7 +46,7 @@ public final class Mappers {
                 t.toAmount, to != null ? to.currency : null,
                 t.exchangeRate, t.amountBase,
                 t.transactionDate, t.description,
-                t.paymentMethod, t.createdAt);
+                t.paymentMethod, t.recurringId, t.createdAt);
     }
 
     public static BudgetDtos.AllocationRuleResponse toAllocationRuleResponse(AllocationRule r) {

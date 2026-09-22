@@ -7,6 +7,7 @@ import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import pe.suarez.finanzas.dto.BudgetDtos.DashboardResponse;
 import pe.suarez.finanzas.service.DashboardService;
+import pe.suarez.finanzas.service.RecurringService;
 
 import java.time.YearMonth;
 
@@ -17,6 +18,7 @@ import java.time.YearMonth;
 public class DashboardResource {
 
     @Inject DashboardService service;
+    @Inject RecurringService recurringService;
 
     /**
      * GET /api/dashboard?period=2026-04
@@ -26,6 +28,7 @@ public class DashboardResource {
     @GET
     public DashboardResponse dashboard(@QueryParam("period") String period) {
         YearMonth ym = period != null ? YearMonth.parse(period) : YearMonth.now();
+        recurringService.materializeDue();
         return service.build(ym);
     }
 }

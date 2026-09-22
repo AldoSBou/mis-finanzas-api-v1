@@ -110,6 +110,14 @@ public final class ErrorCatalog {
                 "Falta el tipo de cambio",
                 "El movimiento está en una moneda distinta a tu moneda base. Indica el tipo de cambio para convertirlo.");
 
+        // Recurrentes
+        register(ErrorCode.RECURRING_NOT_FOUND,
+                "Movimiento recurrente no encontrado",
+                "El recurrente especificado no existe o no pertenece al usuario actual.");
+        register(ErrorCode.RECURRING_INACTIVE,
+                "El recurrente está pausado o terminó",
+                "Reactívalo o ajusta su fecha de fin para registrar nuevas ocurrencias.");
+
         // Reglas
         register(ErrorCode.RULE_NOT_FOUND,
                 "Regla de asignación no encontrada",

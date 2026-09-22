@@ -1,37 +1,18 @@
 package pe.suarez.finanzas.resource;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.RestAssured;
-import io.restassured.path.json.config.JsonPathConfig;
-import io.restassured.specification.RequestSpecification;
-import org.hamcrest.Description;
-import org.hamcrest.Matcher;
-import org.hamcrest.TypeSafeMatcher;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
-import static io.restassured.RestAssured.given;
-import static io.restassured.config.JsonConfig.jsonConfig;
 import static org.hamcrest.Matchers.*;
+import static pe.suarez.finanzas.resource.TestApi.*;
 
 @QuarkusTest
 class AccountsAndTransfersTest {
 
-    private static final String TODAY = LocalDate.now().toString();
     private static final String PERIOD = YearMonth.now().toString();
-
-    @BeforeAll
-    static void bigDecimals() {
-        RestAssured.config = RestAssured.config()
-                .jsonConfig(jsonConfig().numberReturnType(JsonPathConfig.NumberReturnType.BIG_DECIMAL));
-    }
 
     @Test
     void transferToSavingsCountsAsSavingsNotExpense() {
@@ -173,83 +154,5 @@ class AccountsAndTransfersTest {
         as(intruso).body(tx("EXPENSE", efectivo, "5").with("categoryId", categoryId(intruso, "Otros")))
                 .post("/api/transactions").then().statusCode(404)
                 .body("error.code", equalTo("ACCOUNT_NOT_FOUND"));
-    }
-
-    // ------------------------------------------------------------------
-
-    private static final class Tx extends HashMap<String, Object> {
-        Tx with(String key, Object value) {
-            put(key, value);
-            return this;
-        }
-    }
-
-    private static Tx tx(String type, long accountId, String amount) {
-        Tx t = new Tx();
-        t.put("type", type);
-        t.put("accountId", accountId);
-        t.put("amount", amount);
-        t.put("transactionDate", TODAY);
-        return t;
-    }
-
-    /** Compara montos numéricamente: 0, 0.0 y 0.00 son iguales, sea entero o decimal en el JSON. */
-    private static Matcher<Object> money(String expected) {
-        BigDecimal want = new BigDecimal(expected);
-        return new TypeSafeMatcher<>() {
-            @Override
-            protected boolean matchesSafely(Object actual) {
-                return actual instanceof Number && new BigDecimal(actual.toString()).compareTo(want) == 0;
-            }
-
-            @Override
-            public void describeTo(Description d) {
-                d.appendText("monto ").appendValue(want);
-            }
-        };
-    }
-
-    private static RequestSpecification as(String token) {
-        return given().auth().oauth2(token).contentType("application/json");
-    }
-
-    private static String register() {
-        return given().contentType("application/json")
-                .body(Map.of(
-                        "email", "u" + UUID.randomUUID() + "@test.pe",
-                        "password", "Una-clave-larga-2026",
-                        "displayName", "Test"))
-                .post("/api/auth/register")
-                .then().statusCode(201)
-                .extract().path("data.token");
-    }
-
-    private static void createTx(String token, Tx body) {
-        as(token).body(body).post("/api/transactions").then().statusCode(201);
-    }
-
-    private static long createAccount(String token, String name, String type, String currency, String initial) {
-        Number id = as(token)
-                .body(Map.of("name", name, "type", type, "currency", currency, "initialBalance", initial))
-                .post("/api/accounts").then().statusCode(201)
-                .extract().path("data.id");
-        return id.longValue();
-    }
-
-    private static long accountId(String token, String name) {
-        Number id = as(token).get("/api/accounts").then().statusCode(200)
-                .extract().path("data.find { it.name == '" + name + "' }.id");
-        return id.longValue();
-    }
-
-    private static long categoryId(String token, String name) {
-        Number id = as(token).get("/api/categories").then().statusCode(200)
-                .extract().path("data.find { it.name == '" + name + "' }.id");
-        return id.longValue();
-    }
-
-    private static void assertBalance(String token, long accountId, String expected) {
-        as(token).get("/api/accounts/" + accountId).then().statusCode(200)
-                .body("data.balance", comparesEqualTo(new BigDecimal(expected)));
     }
 }

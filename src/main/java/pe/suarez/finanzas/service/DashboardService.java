@@ -8,6 +8,7 @@ import pe.suarez.finanzas.domain.AllocationRule;
 import pe.suarez.finanzas.domain.MonthlyBudget;
 import pe.suarez.finanzas.domain.User;
 import pe.suarez.finanzas.dto.BudgetDtos.*;
+import pe.suarez.finanzas.dto.RecurringDtos.UpcomingItem;
 import pe.suarez.finanzas.mapper.Mappers;
 import pe.suarez.finanzas.repository.AllocationRuleRepository;
 import pe.suarez.finanzas.repository.MonthlyBudgetRepository;
@@ -39,6 +40,7 @@ public class DashboardService {
     @Inject MonthlyBudgetRepository budgetRepo;
     @Inject AllocationRuleRepository ruleRepo;
     @Inject UserContext userContext;
+    @Inject RecurringService recurringService;
 
     public DashboardResponse build(YearMonth ym) {
         Long uid = userContext.userId();
@@ -66,6 +68,18 @@ public class DashboardService {
                 .map(row -> new CategoryTotal((Long) row[0], (String) row[1], (BigDecimal) row[2]))
                 .toList();
 
+        // Proyección: solo tiene sentido para el mes en curso
+        List<UpcomingItem> upcoming = List.of();
+        BigDecimal projectedBalance = null;
+        if (ym.equals(YearMonth.now())) {
+            upcoming = recurringService.upcoming(uid, to);
+            var transferBuckets = recurringService.transferBuckets(uid);
+            projectedBalance = balance;
+            for (UpcomingItem item : upcoming) {
+                projectedBalance = projectedBalance.add(recurringService.effectOnAvailable(item, transferBuckets));
+            }
+        }
+
         User user = User.findById(uid);
         return new DashboardResponse(
                 ym.getYear(), ym.getMonthValue(),
@@ -74,7 +88,9 @@ public class DashboardService {
                 expectedIncome, budgetConfigured,
                 activeRule != null ? Mappers.toAllocationRuleResponse(activeRule) : null,
                 bucketSummaries,
-                topCategories
+                topCategories,
+                upcoming,
+                projectedBalance
         );
     }
 

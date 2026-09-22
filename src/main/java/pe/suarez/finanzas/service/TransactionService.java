@@ -6,6 +6,7 @@ import jakarta.transaction.Transactional;
 import pe.suarez.finanzas.api.ErrorCode;
 import pe.suarez.finanzas.domain.Account;
 import pe.suarez.finanzas.domain.Category;
+import pe.suarez.finanzas.domain.RecurringTransaction;
 import pe.suarez.finanzas.domain.Transaction;
 import pe.suarez.finanzas.domain.TransactionType;
 import pe.suarez.finanzas.domain.User;
@@ -19,6 +20,7 @@ import pe.suarez.finanzas.security.UserContext;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.Map;
@@ -111,6 +113,38 @@ public class TransactionService {
                                 ? t.exchangeRate
                                 : t.amount.divide(t.toAmount, 6, RoundingMode.HALF_UP),
                         t.transactionDate));
+    }
+
+    /** Valida una solicitud sin guardar nada (lanza ApiException si no es válida). */
+    public void validate(TransactionRequest req) {
+        Transaction probe = new Transaction();
+        probe.userId = userContext.userId();
+        apply(probe, req);
+    }
+
+    /**
+     * Crea el movimiento de una ocurrencia de un recurrente. Sin {@code @Transactional}
+     * a propósito: corre dentro de la transacción del llamador, y si la validación falla
+     * la ApiException no marca esa transacción para rollback.
+     */
+    public Transaction createFromRecurring(RecurringTransaction r, LocalDate date,
+                                           BigDecimal amount, BigDecimal exchangeRate) {
+        Transaction t = new Transaction();
+        t.userId = r.userId;
+        apply(t, requestFor(r, date, amount, exchangeRate));
+        t.recurringId = r.id;
+        t.persist();
+        return t;
+    }
+
+    public static TransactionRequest requestFor(RecurringTransaction r, LocalDate date,
+                                                BigDecimal amount, BigDecimal exchangeRate) {
+        return new TransactionRequest(
+                r.type, r.accountId, r.categoryId, r.toAccountId,
+                amount != null ? amount : r.amount,
+                r.toAmount,
+                exchangeRate != null ? exchangeRate : r.exchangeRate,
+                date, r.description, null);
     }
 
     // ---------------------------------------------------------------
@@ -208,7 +242,7 @@ public class TransactionService {
                 .orElseThrow(() -> new ApiException(ErrorCode.TRANSACTION_NOT_FOUND));
     }
 
-    private static String baseCurrency(Long uid) {
+    static String baseCurrency(Long uid) {
         User user = User.findById(uid);
         return user != null ? user.currencyDefault : "PEN";
     }

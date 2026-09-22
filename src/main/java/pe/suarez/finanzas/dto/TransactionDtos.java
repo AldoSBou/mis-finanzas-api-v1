@@ -53,6 +53,7 @@ public final class TransactionDtos {
             LocalDate transactionDate,
             String description,
             String paymentMethod,
+            Long recurringId,
             Instant createdAt
     ) {}
 

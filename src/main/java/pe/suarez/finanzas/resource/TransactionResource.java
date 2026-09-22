@@ -10,6 +10,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import pe.suarez.finanzas.api.ErrorCode;
 import pe.suarez.finanzas.dto.TransactionDtos.*;
 import pe.suarez.finanzas.exception.ApiException;
+import pe.suarez.finanzas.service.RecurringService;
 import pe.suarez.finanzas.service.TransactionService;
 
 import java.time.YearMonth;
@@ -22,6 +23,7 @@ import java.time.YearMonth;
 public class TransactionResource {
 
     @Inject TransactionService service;
+    @Inject RecurringService recurringService;
 
     /**
      * Lista paginada de movimientos. El parámetro `period` espera formato YYYY-MM.
@@ -36,6 +38,7 @@ public class TransactionResource {
             @QueryParam("size") @DefaultValue("20") int size) {
         YearMonth ym = period != null ? YearMonth.parse(period) : YearMonth.now();
         if (size > 100) size = 100;
+        recurringService.materializeDue();
         return service.listForMonth(ym, accountId, page, size);
     }
 
