@@ -84,6 +84,10 @@ Flyway aplicará las migraciones automáticamente.
 | `POST` | `/api/recurring/{id}/register` · `/skip` | Registrar (monto real) u omitir la ocurrencia pendiente |
 | `GET` | `/api/category-budgets?period=2026-09` | Límite, gastado y programado por categoría |
 | `PUT/DELETE` | `/api/category-budgets/{categoryId}` | Definir / quitar límite mensual |
+| `POST` | `/api/imports/preview` | Tipo, categoría sugerida y duplicados de filas de un estado de cuenta |
+| `POST/GET` | `/api/imports` | Importar filas confirmadas (todo o nada) / importaciones recientes |
+| `DELETE` | `/api/imports/{id}` | Deshacer una importación |
+| `GET/POST/PUT/DELETE` | `/api/categorization-rules[/{id}]` | Reglas "si la descripción contiene X → categoría" |
 | `GET` | `/api/reports?until=2026-09&months=12` | Ingresos, gastos, ahorro, patrimonio y gasto por categoría por mes |
 | `GET` | `/api/allocation-rules` | Reglas de asignación (incluye 50/30/20, 70/20/10, Kakebo) |
 | `POST/PUT/DELETE` | `/api/allocation-rules[/{id}]` | CRUD de reglas |
@@ -108,6 +112,8 @@ Flyway aplicará las migraciones automáticamente.
 **Recurrentes sin cron.** En Railway Free el backend se duerme, así que una tarea programada no correría. Las ocurrencias automáticas vencidas se registran al abrir la app (dashboard, movimientos, cuentas, reportes), con `SELECT ... FOR UPDATE` para no duplicar cuando varias pantallas cargan a la vez. Los de confirmación manual quedan como pendientes en el dashboard.
 
 **Presupuesto por categoría.** Límite mensual en moneda base, igual para todos los meses. Estado OK / WARNING (80%) / OVER (100%) sobre lo gastado; `willExceed` avisa si lo programado en recurrentes hará pasar el límite.
+
+**Importación de estados de cuenta.** La web lee el CSV/Excel en el navegador y manda filas interpretadas (fecha, descripción, monto con signo). La categoría se sugiere por reglas del usuario y, si no hay, por el historial: misma descripción normalizada (sin números ni símbolos) o una parecida (Jaccard de palabras ≥ 0.6). Los duplicados se detectan por cuenta + fecha + monto + tipo. Cada importación queda en `import_batches` para deshacerla completa.
 
 **Categorías ↔ Buckets.** Cada categoría tiene un `defaultBucket`. Las transacciones heredan el bucket de su categoría al agregarse en el dashboard. Esto evita duplicar lógica de clasificación en cada movimiento.
 
@@ -152,8 +158,7 @@ java -jar target/quarkus-app/quarkus-run.jar
 
 ## Próximos pasos sugeridos
 
-1. **Importador CSV** de estados de cuenta (BCP, Interbank) con reglas de categorización.
-2. **Metas de ahorro** con progreso.
-3. **Tarjetas de crédito**: fecha de corte y pago, compras en cuotas.
-4. **Registro sin conexión** (cola local en la PWA).
-5. **Tipo de cambio automático** (SUNAT/SBS) para prellenar movimientos en otra moneda.
+1. **Metas de ahorro** con progreso.
+2. **Tarjetas de crédito**: fecha de corte y pago, compras en cuotas.
+3. **Registro sin conexión** (cola local en la PWA).
+4. **Tipo de cambio automático** (SUNAT/SBS) para prellenar movimientos en otra moneda.

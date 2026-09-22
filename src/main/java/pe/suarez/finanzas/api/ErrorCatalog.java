@@ -40,7 +40,7 @@ public final class ErrorCatalog {
                 "La operación no puede completarse por un conflicto, generalmente por un valor duplicado.");
         register(ErrorCode.PAYLOAD_TOO_LARGE,
                 "El cuerpo de la solicitud excede el tamaño máximo permitido",
-                "El servidor limita el tamaño del request body a 256 KB. Reduce el tamaño del payload.");
+                "El servidor limita el tamaño del request body a 1 MB. Reduce el tamaño del payload.");
         register(ErrorCode.UNSUPPORTED_MEDIA_TYPE,
                 "Tipo de contenido no soportado",
                 "El tipo de contenido enviado no es procesable. Usa application/json.");

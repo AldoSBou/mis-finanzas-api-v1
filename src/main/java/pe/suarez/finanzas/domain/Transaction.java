@@ -62,6 +62,10 @@ public class Transaction extends PanacheEntityBase {
     @Column(length = 200)
     public String description;
 
+    /** Importación que creó este movimiento, si aplica. */
+    @Column(name = "import_batch_id")
+    public Long importBatchId;
+
     /** Recurrente que generó este movimiento, si aplica. */
     @Column(name = "recurring_id")
     public Long recurringId;

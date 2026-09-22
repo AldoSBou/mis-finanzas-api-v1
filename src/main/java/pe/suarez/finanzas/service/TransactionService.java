@@ -182,6 +182,18 @@ public class TransactionService {
         return t;
     }
 
+    /**
+     * Crea un movimiento importado. Como {@link #createFromRecurring}, sin
+     * {@code @Transactional}: la importación completa es una sola transacción.
+     */
+    public Transaction createFromImport(TransactionRequest req, Long uid) {
+        Transaction t = new Transaction();
+        t.userId = uid;
+        apply(t, req);
+        t.persist();
+        return t;
+    }
+
     public static TransactionRequest requestFor(RecurringTransaction r, LocalDate date,
                                                 BigDecimal amount, BigDecimal exchangeRate) {
         return new TransactionRequest(
