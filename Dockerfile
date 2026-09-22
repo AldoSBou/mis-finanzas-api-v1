@@ -47,6 +47,8 @@ EXPOSE 8080
 
 USER quarkus
 
-ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseParallelGC"
+# Afinado para Railway Free (0.5 GB, se cobra la RAM usada y cada despertar es un
+# arranque en frío): SerialGC y C1 usan menos memoria y arrancan más rápido.
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=50.0 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k"
 
 ENTRYPOINT ["./entrypoint.sh"]
