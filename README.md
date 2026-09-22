@@ -72,8 +72,11 @@ Flyway aplicará las migraciones automáticamente.
 | `GET` | `/api/categories` | Lista categorías del usuario |
 | `POST` | `/api/categories` | Crea categoría personalizada |
 | `PUT/DELETE` | `/api/categories/{id}` | Actualiza/archiva |
-| `GET` | `/api/transactions?period=2026-04&page=0&size=20` | Movimientos del mes |
-| `POST/PUT/DELETE` | `/api/transactions[/{id}]` | CRUD de movimientos |
+| `GET` | `/api/accounts` | Cuentas con su saldo actual |
+| `POST/PUT/DELETE` | `/api/accounts[/{id}]` | Crea/actualiza/archiva cuentas |
+| `GET` | `/api/transactions?period=2026-04&accountId=3&page=0&size=20` | Movimientos del mes (opcional: de una cuenta) |
+| `POST/PUT/DELETE` | `/api/transactions[/{id}]` | CRUD de ingresos, gastos y transferencias |
+| `GET` | `/api/transactions/exchange-rate?currency=USD` | Último tipo de cambio usado (204 si ninguno) |
 | `GET` | `/api/allocation-rules` | Reglas de asignación (incluye 50/30/20, 70/20/10, Kakebo) |
 | `POST/PUT/DELETE` | `/api/allocation-rules[/{id}]` | CRUD de reglas |
 | `GET` | `/api/budgets?period=2026-04` | Presupuesto del mes |
@@ -87,6 +90,12 @@ Flyway aplicará las migraciones automáticamente.
 **Montos en `BigDecimal(14,2)`.** Nunca `double` o `float` para dinero. Soporta hasta `999,999,999,999.99`.
 
 **Reglas de asignación con JSONB.** El campo `percentages` es un mapa `bucket → %` flexible. Permite cualquier metodología (50/30/20, 70/20/10, Kakebo, custom) sin cambiar el schema. Los buckets son un enum (`AllocationBucket`).
+
+**Cuentas y transferencias.** Cada movimiento pertenece a una cuenta (efectivo, banco, tarjeta, Yape, ahorro, inversión). El saldo se calcula: saldo inicial + ingresos − gastos − transferencias salientes + entrantes. Una `TRANSFER` no es ingreso ni gasto: pagar la tarjeta no duplica el gasto (ya se registró al comprar). Transferir a una cuenta `SAVINGS`/`INVESTMENT` cuenta como ahorro del mes; sacar dinero de ella lo resta.
+
+**Multi-moneda.** La moneda es la de la cuenta. Cada movimiento guarda `exchange_rate` y `amount_base` (monto en la moneda base del usuario). Los reportes suman solo `amount_base`. En transferencias hacia la moneda base el tipo de cambio sale de los montos (100 USD → 372 PEN = 3.72); en otros casos el cliente lo envía.
+
+**Dashboard.** `expenses` es consumo (sin categorías de ahorro/inversión), `savings` es ahorro neto del mes y `balance = income − expenses − savings`.
 
 **Categorías ↔ Buckets.** Cada categoría tiene un `defaultBucket`. Las transacciones heredan el bucket de su categoría al agregarse en el dashboard. Esto evita duplicar lógica de clasificación en cada movimiento.
 
@@ -112,7 +121,9 @@ Flyway aplicará las migraciones automáticamente.
 ./mvnw test
 ```
 
-Los tests usan `@QuarkusTest` con `quarkus-test-security-jwt` para inyectar JWTs simulados.
+Los tests usan `@QuarkusTest` y **Dev Services**: levantan un PostgreSQL desechable en Docker (requiere Docker corriendo) y aplican las migraciones reales. Nunca tocan tu base local.
+
+`src/test/resources/docker-java.properties` fija la API de Docker en 1.44: Docker Engine 29+ rechaza la versión antigua que pide el Testcontainers de Quarkus 3.21. Se puede quitar al actualizar Quarkus.
 
 ## Build
 
@@ -133,4 +144,4 @@ java -jar target/quarkus-app/quarkus-run.jar
 2. **Importador CSV** de movimientos bancarios (BCP, Interbank).
 3. **Recurrencias** (suscripciones, sueldos) — nueva tabla + scheduler.
 4. **Reportes históricos** mes vs mes / año vs año.
-5. **Multi-currency** con tipo de cambio diario.
+5. **Tipo de cambio automático** (SUNAT/SBS) para prellenar movimientos en otra moneda.

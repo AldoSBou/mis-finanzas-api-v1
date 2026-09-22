@@ -79,6 +79,20 @@ public final class ErrorCatalog {
                 "Categoría no encontrada",
                 "La categoría especificada no existe o no pertenece al usuario actual.");
 
+        // Cuentas
+        register(ErrorCode.ACCOUNT_NOT_FOUND,
+                "Cuenta no encontrada",
+                "La cuenta especificada no existe o no pertenece al usuario actual.");
+        register(ErrorCode.ACCOUNT_ARCHIVED,
+                "La cuenta está archivada",
+                "No se pueden registrar movimientos nuevos en una cuenta archivada.");
+        register(ErrorCode.ACCOUNT_CURRENCY_LOCKED,
+                "No se puede cambiar la moneda de la cuenta",
+                "La cuenta ya tiene movimientos registrados en su moneda actual. Crea una cuenta nueva para la otra moneda.");
+        register(ErrorCode.CURRENCY_INVALID,
+                "Moneda inválida",
+                "La moneda debe ser un código ISO 4217 válido de tres letras (ej. PEN, USD, EUR).");
+
         // Movimientos
         register(ErrorCode.TRANSACTION_NOT_FOUND,
                 "Movimiento no encontrado",
@@ -86,6 +100,15 @@ public final class ErrorCatalog {
         register(ErrorCode.TRANSACTION_TYPE_MISMATCH,
                 "El tipo del movimiento no coincide con la categoría",
                 "Se intentó crear/actualizar un movimiento de tipo distinto al de su categoría (ej. INCOME en categoría EXPENSE).");
+        register(ErrorCode.TRANSACTION_CATEGORY_REQUIRED,
+                "La categoría es obligatoria",
+                "Los ingresos y gastos requieren una categoría. Solo las transferencias no la llevan.");
+        register(ErrorCode.TRANSFER_INVALID,
+                "Transferencia inválida",
+                "Una transferencia necesita una cuenta destino distinta a la de origen y, si las monedas difieren, el monto recibido.");
+        register(ErrorCode.EXCHANGE_RATE_REQUIRED,
+                "Falta el tipo de cambio",
+                "El movimiento está en una moneda distinta a tu moneda base. Indica el tipo de cambio para convertirlo.");
 
         // Reglas
         register(ErrorCode.RULE_NOT_FOUND,

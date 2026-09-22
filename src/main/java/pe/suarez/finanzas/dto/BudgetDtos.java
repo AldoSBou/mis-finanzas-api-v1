@@ -54,11 +54,18 @@ public final class BudgetDtos {
             BigDecimal total
     ) {}
 
+    /**
+     * Montos en la moneda base del usuario.
+     * {@code expenses} es consumo (sin ahorro ni inversión); {@code savings} es el ahorro
+     * neto del mes; {@code balance = income - expenses - savings}.
+     */
     public record DashboardResponse(
             int year,
             int month,
+            String baseCurrency,
             BigDecimal income,
             BigDecimal expenses,
+            BigDecimal savings,
             BigDecimal balance,
             BigDecimal savingsYearToDate,
             BigDecimal expectedIncome,      // NUEVO: lo que se usó como base de cálculo

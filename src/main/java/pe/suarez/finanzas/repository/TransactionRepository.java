@@ -16,8 +16,15 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Las agregaciones suman siempre {@code amountBase} (moneda base del usuario),
+ * nunca {@code amount}, para no mezclar monedas.
+ */
 @ApplicationScoped
 public class TransactionRepository implements PanacheRepository<Transaction> {
+
+    private static final List<AllocationBucket> SAVINGS_BUCKETS =
+            List.of(AllocationBucket.SAVINGS, AllocationBucket.INVESTMENT);
 
     @Inject
     EntityManager em;
@@ -26,38 +33,43 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
         return find("id = ?1 AND userId = ?2", id, userId).firstResultOptional();
     }
 
-    public List<Transaction> listForMonth(Long userId, YearMonth ym, int page, int size) {
-        LocalDate from = ym.atDay(1);
-        LocalDate to = ym.atEndOfMonth();
-        return find("userId = ?1 AND transactionDate BETWEEN ?2 AND ?3",
+    private record Filter(String query, Object[] params) {}
+
+    /** Movimientos del mes; si {@code accountId} no es null, solo los que tocan esa cuenta. */
+    private Filter monthFilter(Long userId, YearMonth ym, Long accountId) {
+        String q = "userId = ?1 AND transactionDate BETWEEN ?2 AND ?3";
+        if (accountId == null) {
+            return new Filter(q, new Object[]{userId, ym.atDay(1), ym.atEndOfMonth()});
+        }
+        return new Filter(q + " AND (accountId = ?4 OR toAccountId = ?4)",
+                new Object[]{userId, ym.atDay(1), ym.atEndOfMonth(), accountId});
+    }
+
+    public List<Transaction> listForMonth(Long userId, YearMonth ym, Long accountId, int page, int size) {
+        Filter f = monthFilter(userId, ym, accountId);
+        return find(f.query(),
                 Sort.by("transactionDate").descending().and("id", Sort.Direction.Descending),
-                userId, from, to)
+                f.params())
                 .page(Page.of(page, size))
                 .list();
     }
 
-    public long countForMonth(Long userId, YearMonth ym) {
-        LocalDate from = ym.atDay(1);
-        LocalDate to = ym.atEndOfMonth();
-        return count("userId = ?1 AND transactionDate BETWEEN ?2 AND ?3", userId, from, to);
+    public long countForMonth(Long userId, YearMonth ym, Long accountId) {
+        Filter f = monthFilter(userId, ym, accountId);
+        return count(f.query(), f.params());
     }
 
-    /**
-     * Suma total para un mes y tipo (INCOME o EXPENSE).
-     * Devuelve ZERO si no hay registros.
-     */
-    public BigDecimal sumByType(Long userId, YearMonth ym, TransactionType type) {
-        LocalDate from = ym.atDay(1);
-        LocalDate to = ym.atEndOfMonth();
+    /** Suma de ingresos en el rango. Devuelve ZERO si no hay registros. */
+    public BigDecimal sumIncome(Long userId, LocalDate from, LocalDate to) {
         BigDecimal result = em.createQuery("""
-                        SELECT COALESCE(SUM(t.amount), 0)
+                        SELECT COALESCE(SUM(t.amountBase), 0)
                         FROM Transaction t
                         WHERE t.userId = :uid
                           AND t.type = :type
                           AND t.transactionDate BETWEEN :from AND :to
                         """, BigDecimal.class)
                 .setParameter("uid", userId)
-                .setParameter("type", type)
+                .setParameter("type", TransactionType.INCOME)
                 .setParameter("from", from)
                 .setParameter("to", to)
                 .getSingleResult();
@@ -65,38 +77,36 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
     }
 
     /**
-     * Agrupa gastos del mes por categoría.
+     * Top categorías de consumo (excluye categorías de ahorro/inversión).
      * Devuelve filas: [categoryId, categoryName, totalAmount].
      */
-    public List<Object[]> sumByCategoryForMonth(Long userId, YearMonth ym) {
-        LocalDate from = ym.atDay(1);
-        LocalDate to = ym.atEndOfMonth();
+    public List<Object[]> sumConsumptionByCategory(Long userId, LocalDate from, LocalDate to) {
         return em.createQuery("""
-                        SELECT c.id, c.name, COALESCE(SUM(t.amount), 0)
+                        SELECT c.id, c.name, COALESCE(SUM(t.amountBase), 0)
                         FROM Transaction t, Category c
                         WHERE t.categoryId = c.id
                           AND t.userId = :uid
                           AND t.type = :type
+                          AND (c.defaultBucket IS NULL OR c.defaultBucket NOT IN (:savings))
                           AND t.transactionDate BETWEEN :from AND :to
                         GROUP BY c.id, c.name
                         ORDER BY 3 DESC
                         """, Object[].class)
                 .setParameter("uid", userId)
                 .setParameter("type", TransactionType.EXPENSE)
+                .setParameter("savings", SAVINGS_BUCKETS)
                 .setParameter("from", from)
                 .setParameter("to", to)
                 .getResultList();
     }
 
     /**
-     * Agrupa gastos del mes por bucket de asignación.
-     * Devuelve filas: [bucket, totalAmount].
+     * Agrupa gastos por bucket de su categoría (incluye categorías de ahorro heredadas).
+     * Devuelve filas: [bucket (puede ser null), totalAmount].
      */
-    public List<Object[]> sumByBucketForMonth(Long userId, YearMonth ym) {
-        LocalDate from = ym.atDay(1);
-        LocalDate to = ym.atEndOfMonth();
+    public List<Object[]> sumExpensesByBucket(Long userId, LocalDate from, LocalDate to) {
         return em.createQuery("""
-                        SELECT c.defaultBucket, COALESCE(SUM(t.amount), 0)
+                        SELECT c.defaultBucket, COALESCE(SUM(t.amountBase), 0)
                         FROM Transaction t, Category c
                         WHERE t.categoryId = c.id
                           AND t.userId = :uid
@@ -112,24 +122,52 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
     }
 
     /**
-     * Total de ahorro acumulado del año (suma de transacciones cuyo bucket es SAVINGS o INVESTMENT).
+     * Transferencias agrupadas por tipo de cuenta origen y destino.
+     * Devuelve filas: [AccountType origen, AccountType destino, totalAmountBase].
      */
-    public BigDecimal sumSavingsYearToDate(Long userId, int year) {
-        LocalDate from = LocalDate.of(year, 1, 1);
-        LocalDate to = LocalDate.of(year, 12, 31);
-        BigDecimal result = em.createQuery("""
-                        SELECT COALESCE(SUM(t.amount), 0)
-                        FROM Transaction t, Category c
-                        WHERE t.categoryId = c.id
+    public List<Object[]> sumTransfersByAccountTypes(Long userId, LocalDate from, LocalDate to) {
+        return em.createQuery("""
+                        SELECT a.type, b.type, COALESCE(SUM(t.amountBase), 0)
+                        FROM Transaction t, Account a, Account b
+                        WHERE t.accountId = a.id
+                          AND t.toAccountId = b.id
                           AND t.userId = :uid
-                          AND c.defaultBucket IN (:buckets)
+                          AND t.type = :type
                           AND t.transactionDate BETWEEN :from AND :to
-                        """, BigDecimal.class)
+                        GROUP BY a.type, b.type
+                        """, Object[].class)
                 .setParameter("uid", userId)
-                .setParameter("buckets", List.of(AllocationBucket.SAVINGS, AllocationBucket.INVESTMENT))
+                .setParameter("type", TransactionType.TRANSFER)
                 .setParameter("from", from)
                 .setParameter("to", to)
-                .getSingleResult();
-        return result != null ? result : BigDecimal.ZERO;
+                .getResultList();
+    }
+
+    /** Último movimiento del usuario en una moneda (para sugerir su tipo de cambio). */
+    public Optional<Transaction> latestInCurrency(Long userId, String currency) {
+        return find("userId = ?1 AND currency = ?2",
+                Sort.by("transactionDate").descending().and("id", Sort.Direction.Descending),
+                userId, currency)
+                .firstResultOptional();
+    }
+
+    /** Última compra de {@code currency} con moneda base: transferencia base → cuenta en {@code currency}. */
+    public Optional<Transaction> latestTransferInto(Long userId, String currency, String baseCurrency) {
+        return em.createQuery("""
+                        SELECT t FROM Transaction t, Account b
+                        WHERE t.toAccountId = b.id
+                          AND t.userId = :uid
+                          AND t.type = :type
+                          AND b.currency = :currency
+                          AND t.currency = :base
+                        ORDER BY t.transactionDate DESC, t.id DESC
+                        """, Transaction.class)
+                .setParameter("uid", userId)
+                .setParameter("type", TransactionType.TRANSFER)
+                .setParameter("currency", currency)
+                .setParameter("base", baseCurrency)
+                .setMaxResults(1)
+                .getResultStream()
+                .findFirst();
     }
 }
