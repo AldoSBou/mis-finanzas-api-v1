@@ -6,7 +6,9 @@ import jakarta.transaction.Transactional;
 import pe.suarez.finanzas.api.ErrorCode;
 import pe.suarez.finanzas.domain.Account;
 import pe.suarez.finanzas.domain.Category;
+import pe.suarez.finanzas.domain.AccountType;
 import pe.suarez.finanzas.domain.GoalContribution;
+import pe.suarez.finanzas.domain.InstallmentPlan;
 import pe.suarez.finanzas.domain.RecurringTransaction;
 import pe.suarez.finanzas.domain.Transaction;
 import pe.suarez.finanzas.domain.TransactionType;
@@ -122,9 +124,10 @@ public class TransactionService {
     public TransactionResponse create(TransactionRequest req) {
         Transaction t = new Transaction();
         t.userId = userContext.userId();
-        TransactionResponse resp = apply(t, req);
+        apply(t, req);
         t.persist();
-        return resp;
+        // La respuesta se arma después de persistir para que lleve el id
+        return get(t.id);
     }
 
     @Transactional
@@ -135,6 +138,11 @@ public class TransactionService {
         for (GoalContribution c : GoalContribution.<GoalContribution>list("transactionId", t.id)) {
             c.amount = c.amount.signum() < 0 ? t.amount.negate() : t.amount;
             c.contributionDate = t.transactionDate;
+        }
+        // Las cuotas solo aplican a compras con tarjeta de crédito
+        Account account = Account.findById(t.accountId);
+        if (t.type != TransactionType.EXPENSE || account.type != AccountType.CREDIT_CARD) {
+            InstallmentPlan.delete("transactionId", t.id);
         }
         return resp;
     }

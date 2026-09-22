@@ -15,7 +15,11 @@ public final class AccountDtos {
             @NotBlank @Pattern(regexp = "[A-Z]{3}", message = "Usa un código de moneda de 3 letras (PEN, USD...)") String currency,
             @Digits(integer = 12, fraction = 2) BigDecimal initialBalance,
             @Size(max = 7) String color,
-            @Size(max = 40) String icon
+            @Size(max = 40) String icon,
+            /** Solo tarjetas de crédito */
+            @DecimalMin(value = "0.01", message = "La línea debe ser mayor a 0") @Digits(integer = 12, fraction = 2) BigDecimal creditLimit,
+            @Min(1) @Max(31) Integer statementDay,
+            @Min(1) @Max(31) Integer dueDay
     ) {}
 
     public record AccountResponse(
@@ -27,6 +31,9 @@ public final class AccountDtos {
             BigDecimal balance,
             String color,
             String icon,
-            boolean archived
+            boolean archived,
+            BigDecimal creditLimit,
+            Integer statementDay,
+            Integer dueDay
     ) {}
 }

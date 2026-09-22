@@ -31,6 +31,18 @@ public class Account extends PanacheEntityBase {
     @Column(name = "initial_balance", nullable = false, precision = 14, scale = 2)
     public BigDecimal initialBalance = BigDecimal.ZERO;
 
+    /** Solo tarjetas: línea de crédito */
+    @Column(name = "credit_limit", precision = 14, scale = 2)
+    public BigDecimal creditLimit;
+
+    /** Solo tarjetas: día de cierre del estado de cuenta (1-31) */
+    @Column(name = "statement_day")
+    public Integer statementDay;
+
+    /** Solo tarjetas: último día de pago (1-31) */
+    @Column(name = "due_day")
+    public Integer dueDay;
+
     @Column(length = 7)
     public String color;
 

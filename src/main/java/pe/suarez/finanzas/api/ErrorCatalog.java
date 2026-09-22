@@ -126,6 +126,11 @@ public final class ErrorCatalog {
                 "Operación no válida para la meta",
                 "Revisa el detalle: monto, cuenta o saldo disponible.");
 
+        // Tarjetas
+        register(ErrorCode.CARD_INVALID,
+                "Operación no válida para la tarjeta",
+                "Revisa el detalle: la cuenta debe ser una tarjeta de crédito y las fechas o cuotas deben ser válidas.");
+
         // Reglas
         register(ErrorCode.RULE_NOT_FOUND,
                 "Regla de asignación no encontrada",

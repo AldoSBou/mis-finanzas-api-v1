@@ -11,6 +11,9 @@ import pe.suarez.finanzas.api.ErrorCode;
 import pe.suarez.finanzas.domain.TransactionType;
 import pe.suarez.finanzas.dto.TransactionDtos.*;
 import pe.suarez.finanzas.exception.ApiException;
+import pe.suarez.finanzas.dto.CardDtos.InstallmentRequest;
+import pe.suarez.finanzas.dto.CardDtos.InstallmentResponse;
+import pe.suarez.finanzas.service.CardService;
 import pe.suarez.finanzas.service.RecurringService;
 import pe.suarez.finanzas.service.TransactionService;
 
@@ -27,6 +30,7 @@ public class TransactionResource {
 
     @Inject TransactionService service;
     @Inject RecurringService recurringService;
+    @Inject CardService cardService;
 
     /**
      * Filtros de búsqueda compartidos por el listado y la exportación.
@@ -126,6 +130,28 @@ public class TransactionResource {
     @Path("/{id}")
     public Response delete(@PathParam("id") Long id) {
         service.delete(id);
+        return Response.noContent().build();
+    }
+
+    /** Plan de cuotas de una compra con tarjeta (204 si se pagó en una sola). */
+    @GET
+    @Path("/{id}/installments")
+    public Response installments(@PathParam("id") Long id) {
+        return cardService.getInstallments(id)
+                .map(p -> Response.ok(p).build())
+                .orElseGet(() -> Response.noContent().build());
+    }
+
+    @PUT
+    @Path("/{id}/installments")
+    public InstallmentResponse setInstallments(@PathParam("id") Long id, @Valid InstallmentRequest req) {
+        return cardService.setInstallments(id, req);
+    }
+
+    @DELETE
+    @Path("/{id}/installments")
+    public Response removeInstallments(@PathParam("id") Long id) {
+        cardService.removeInstallments(id);
         return Response.noContent().build();
     }
 }

@@ -5,6 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import pe.suarez.finanzas.api.ErrorCode;
 import pe.suarez.finanzas.domain.Account;
+import pe.suarez.finanzas.domain.AccountType;
 import pe.suarez.finanzas.dto.AccountDtos.*;
 import pe.suarez.finanzas.exception.ApiException;
 import pe.suarez.finanzas.mapper.Mappers;
@@ -75,6 +76,10 @@ public class AccountService {
         a.initialBalance = req.initialBalance() != null ? req.initialBalance() : BigDecimal.ZERO;
         a.color = req.color();
         a.icon = req.icon();
+        boolean card = a.type == AccountType.CREDIT_CARD;
+        a.creditLimit = card ? req.creditLimit() : null;
+        a.statementDay = card ? req.statementDay() : null;
+        a.dueDay = card ? req.dueDay() : null;
     }
 
     private static String validCurrency(String code) {

@@ -48,6 +48,9 @@ public enum ErrorCode {
     GOAL_NOT_FOUND(404),
     GOAL_INVALID(400),
 
+    // Tarjetas
+    CARD_INVALID(400),
+
     // Reglas
     RULE_NOT_FOUND(404),
     RULE_TEMPLATE_LOCKED(400),

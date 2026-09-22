@@ -29,7 +29,7 @@ public final class Mappers {
     public static AccountDtos.AccountResponse toAccountResponse(Account a, BigDecimal balance) {
         return new AccountDtos.AccountResponse(
                 a.id, a.name, a.type, a.currency, a.initialBalance, balance,
-                a.color, a.icon, a.archived);
+                a.color, a.icon, a.archived, a.creditLimit, a.statementDay, a.dueDay);
     }
 
     /** {@code c} es null en transferencias; {@code to} es null en ingresos/gastos. */
