@@ -24,7 +24,7 @@ import java.util.*;
 @ApplicationScoped
 public class ReportService {
 
-    /** Categorías con serie propia; el resto se agrupa en "Otros". */
+    /** Categorías con serie propia; el resto se agrupa en "Resto" (no "Otros": es una categoría). */
     private static final int TOP_CATEGORIES = 5;
 
     @Inject TransactionRepository txRepo;
@@ -76,7 +76,7 @@ public class ReportService {
         return new ReportResponse(base, months, categorySeries(categoryByMonth, categoryNames), approximate);
     }
 
-    /** Top N categorías por total del período y una serie "Otros" con el resto. */
+    /** Top N categorías por total del período y una serie "Resto" con las demás. */
     private static List<CategorySeries> categorySeries(List<Map<Long, BigDecimal>> byMonth,
                                                        Map<Long, String> names) {
         Map<Long, BigDecimal> totals = new HashMap<>();
@@ -101,7 +101,7 @@ public class ReportService {
                 .toList();
         BigDecimal othersTotal = others.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         if (othersTotal.signum() > 0) {
-            series.add(new CategorySeries(null, "Otros", othersTotal, others));
+            series.add(new CategorySeries(null, "Resto", othersTotal, others));
         }
         return series;
     }
