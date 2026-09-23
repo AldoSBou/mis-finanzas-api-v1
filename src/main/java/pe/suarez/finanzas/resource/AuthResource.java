@@ -44,6 +44,15 @@ public class AuthResource {
         return authService.login(req);
     }
 
+    /** Renueva la sesión de la app móvil sin pedir la contraseña. */
+    @POST
+    @Path("/refresh")
+    @PermitAll
+    @RateLimited
+    public TokenResponse refresh(@Valid RefreshRequest req) {
+        return authService.refresh(req);
+    }
+
     @GET
     @Path("/me")
     @Authenticated
@@ -64,8 +73,8 @@ public class AuthResource {
     @POST
     @Path("/logout")
     @Authenticated
-    public Response logout() {
-        authService.logout(jwt);
+    public Response logout(RefreshRequest body) {
+        authService.logout(jwt, body != null ? body.refreshToken() : null);
         return Response.noContent().build();
     }
 }

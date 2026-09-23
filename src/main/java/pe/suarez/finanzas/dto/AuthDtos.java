@@ -18,18 +18,27 @@ public final class AuthDtos {
     public record RegisterRequest(
             @Email @NotBlank @Size(max = 120) String email,
             @NotBlank @Size(max = 200) String password,
-            @Size(max = 80) String displayName
+            @Size(max = 80) String displayName,
+            /** App móvil: pide además un refresh token para no volver a iniciar sesión */
+            Boolean rememberDevice
     ) {}
 
     public record LoginRequest(
             @Email @NotBlank @Size(max = 120) String email,
-            @NotBlank @Size(max = 200) String password
+            @NotBlank @Size(max = 200) String password,
+            Boolean rememberDevice
     ) {}
 
+    public record RefreshRequest(
+            @NotBlank @Size(max = 100) String refreshToken
+    ) {}
+
+    /** {@code refreshToken} solo viene si se pidió {@code rememberDevice}. */
     public record TokenResponse(
             String token,
             long expiresInSeconds,
-            UserResponse user
+            UserResponse user,
+            String refreshToken
     ) {}
 
     public record UserResponse(

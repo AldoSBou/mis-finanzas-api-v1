@@ -15,6 +15,7 @@ import pe.suarez.finanzas.exception.ApiException;
 import pe.suarez.finanzas.mapper.Mappers;
 import pe.suarez.finanzas.security.JwtIssuer;
 import pe.suarez.finanzas.security.RateLimitService;
+import pe.suarez.finanzas.security.RefreshTokenService;
 import pe.suarez.finanzas.security.TokenDenyList;
 
 import java.time.Instant;
@@ -47,6 +48,7 @@ public class AuthService {
     @Inject RateLimitService rateLimitService;
     @Inject TokenDenyList tokenDenyList;
     @Inject PasswordPolicy passwordPolicy;
+    @Inject RefreshTokenService refreshTokens;
 
     @PostConstruct
     void init() {
@@ -74,10 +76,10 @@ public class AuthService {
                 .setParameter("uid", user.id)
                 .getSingleResult();
 
-        String token = jwtIssuer.issueFor(user);
-        return new TokenResponse(token, jwtIssuer.durationSeconds(), Mappers.toUserResponse(user));
+        return tokensFor(user, Boolean.TRUE.equals(req.rememberDevice()));
     }
 
+    @Transactional
     public TokenResponse login(LoginRequest req) {
         String emailNorm = req.email() != null ? req.email().toLowerCase().trim() : "";
 
@@ -111,8 +113,26 @@ public class AuthService {
         rateLimitService.resetEmailFailures(emailNorm);
 
         User user = userOpt.get();
+        return tokensFor(user, Boolean.TRUE.equals(req.rememberDevice()));
+    }
+
+    /**
+     * Nueva sesión a partir de un refresh token (que queda revocado: rotación).
+     * No revierte ante {@link ApiException}: si se detecta el reuso de un token, la
+     * revocación de todas las sesiones del usuario debe quedar guardada.
+     */
+    @Transactional(dontRollbackOn = ApiException.class)
+    public TokenResponse refresh(RefreshRequest req) {
+        Long userId = refreshTokens.consume(req.refreshToken());
+        User user = User.findById(userId);
+        if (user == null) throw new ApiException(ErrorCode.AUTH_TOKEN_INVALID);
+        return tokensFor(user, true);
+    }
+
+    private TokenResponse tokensFor(User user, boolean rememberDevice) {
         String token = jwtIssuer.issueFor(user);
-        return new TokenResponse(token, jwtIssuer.durationSeconds(), Mappers.toUserResponse(user));
+        String refresh = rememberDevice ? refreshTokens.issue(user.id) : null;
+        return new TokenResponse(token, jwtIssuer.durationSeconds(), Mappers.toUserResponse(user), refresh);
     }
 
     /**
@@ -121,7 +141,12 @@ public class AuthService {
      *
      * <p><b>MITIGACIÓN MF-03</b>
      */
-    public void logout(JsonWebToken jwt) {
+    @Transactional
+    public void logout(JsonWebToken jwt, String refreshToken) {
+        // La app móvil manda su refresh token para cerrar también la sesión del dispositivo
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokens.revoke(refreshToken);
+        }
         if (jwt == null || jwt.getTokenID() == null) {
             // Sin jti no hay nada que revocar específicamente; igual respondemos OK
             // para no filtrar info al cliente.
