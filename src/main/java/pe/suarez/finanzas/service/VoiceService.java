@@ -46,8 +46,9 @@ public class VoiceService {
             Eres el intérprete de una app de gastos personales usada en Perú.
             Recibes la lista de categorías de la persona (con id) y una frase dicha por voz o una foto
             (voucher de tarjeta, boleta, captura de Yape o Plin, comprobante de transferencia).
-            Devuelve el monto en soles (si dice "veinte con cincuenta" es 20.50; "mil doscientos" es 1200;
-            en una boleta es el TOTAL, no un subtotal ni el vuelto), el tipo (EXPENSE si gastó o pagó;
+            Devuelve el monto tal como aparece, sin convertir (si dice "veinte con cincuenta" es 20.50; "mil
+            doscientos" es 1200; en una boleta es el TOTAL, no un subtotal ni el vuelto), la moneda del
+            monto (PEN si dice S/ o soles; USD si dice $, US$ o dólares; null si no se distingue), el tipo (EXPENSE si gastó o pagó;
             INCOME si recibió dinero, p. ej. "te yapearon"), el id de la categoría más probable (null si
             ninguna encaja de verdad), una descripción corta (comercio o a quién se pagó, sin repetir el
             monto ni el nombre de la categoría) y la fecha del comprobante en formato YYYY-MM-DD si se ve,
@@ -153,7 +154,12 @@ public class VoiceService {
             }
         }
 
-        return new VoiceParseResponse(amount, type, cat != null ? cat.id : null, cat != null ? cat.name : null,
+        String currency = TransactionService.baseCurrency(uid);
+        if (parsed.currency() != null && parsed.currency().trim().matches("[A-Za-z]{3}")) {
+            currency = parsed.currency().trim().toUpperCase();
+        }
+
+        return new VoiceParseResponse(amount, currency, type, cat != null ? cat.id : null, cat != null ? cat.name : null,
                 description, date);
     }
 }

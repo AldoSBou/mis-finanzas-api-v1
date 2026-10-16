@@ -25,6 +25,8 @@ public final class VoiceDtos {
     /** Respuesta al teléfono. {@code amount}, {@code categoryId} y {@code date} pueden ser null si no se entendieron. */
     public record VoiceParseResponse(
             BigDecimal amount,
+            /** Moneda del comprobante (PEN, USD...). Si no se distingue, la moneda base del usuario. */
+            String currency,
             String type,
             Long categoryId,
             String categoryName,
@@ -35,8 +37,10 @@ public final class VoiceDtos {
 
     /** Esquema que debe devolver el modelo (salida estructurada). */
     public record Parsed(
-            @JsonPropertyDescription("Monto en la moneda del usuario, con decimales. null si no se menciona un monto.")
+            @JsonPropertyDescription("Monto tal como aparece, con decimales, sin convertir de moneda. null si no se menciona un monto.")
             Double amount,
+            @JsonPropertyDescription("Moneda del monto en código ISO: PEN si dice S/ o soles; USD si dice $, US$ o dólares; EUR si dice €. null si no se distingue.")
+            String currency,
             @JsonPropertyDescription("EXPENSE si la persona gastó o pagó; INCOME si recibió dinero.")
             String type,
             @JsonPropertyDescription("id de la categoría más probable de la lista dada, o null si ninguna encaja.")
