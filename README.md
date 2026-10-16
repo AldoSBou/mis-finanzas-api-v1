@@ -91,6 +91,7 @@ Flyway aplicará las migraciones automáticamente.
 | `GET/POST` | `/api/goals` | Metas de ahorro con progreso y saldo sin asignar por cuenta |
 | `PUT/DELETE` | `/api/goals/{id}` | Editar / eliminar meta |
 | `GET/POST/DELETE` | `/api/goals/{id}/contributions[/{cid}]` | Aportes y retiros (con o sin transferencia) |
+| `GET` | `/api/cashflow?until=2026-10&months=3` | Flujo de caja: ingresos, gastos y ahorro por categoría y por mes (1 a 6), con totales, neto y acumulado |
 | `GET` | `/api/reports?until=2026-09&months=12` | Ingresos, gastos, ahorro, patrimonio y gasto por categoría por mes |
 | `GET` | `/api/allocation-rules` | Reglas de asignación (incluye 50/30/20, 70/20/10, Kakebo) |
 | `POST/PUT/DELETE` | `/api/allocation-rules[/{id}]` | CRUD de reglas |

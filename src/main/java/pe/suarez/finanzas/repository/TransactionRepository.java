@@ -134,6 +134,11 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
 
     /** Gastos del rango por categoría (todas las de gasto), en moneda base. */
     public Map<Long, BigDecimal> sumExpensesByCategory(Long userId, LocalDate from, LocalDate to) {
+        return sumByCategory(userId, TransactionType.EXPENSE, from, to);
+    }
+
+    /** Ingresos o gastos del rango por categoría, en moneda base. */
+    public Map<Long, BigDecimal> sumByCategory(Long userId, TransactionType type, LocalDate from, LocalDate to) {
         Map<Long, BigDecimal> result = new HashMap<>();
         em.createQuery("""
                         SELECT t.categoryId, COALESCE(SUM(t.amountBase), 0)
@@ -144,11 +149,52 @@ public class TransactionRepository implements PanacheRepository<Transaction> {
                         GROUP BY t.categoryId
                         """, Object[].class)
                 .setParameter("uid", userId)
-                .setParameter("type", TransactionType.EXPENSE)
+                .setParameter("type", type)
                 .setParameter("from", from)
                 .setParameter("to", to)
                 .getResultList()
                 .forEach(row -> result.put((Long) row[0], (BigDecimal) row[1]));
+        return result;
+    }
+
+    /**
+     * Aporte neto a cada cuenta de ahorro o inversión en el rango: lo que entró por
+     * transferencia menos lo que salió. Las cuentas corrientes no aparecen.
+     */
+    public Map<Long, BigDecimal> sumSavingsByAccount(Long userId, LocalDate from, LocalDate to) {
+        Map<Long, BigDecimal> result = new HashMap<>();
+        em.createQuery("""
+                        SELECT b.id, COALESCE(SUM(t.amountBase), 0)
+                        FROM Transaction t, Account b
+                        WHERE t.toAccountId = b.id
+                          AND b.type IN (pe.suarez.finanzas.domain.AccountType.SAVINGS, pe.suarez.finanzas.domain.AccountType.INVESTMENT)
+                          AND t.userId = :uid
+                          AND t.type = :type
+                          AND t.transactionDate BETWEEN :from AND :to
+                        GROUP BY b.id
+                        """, Object[].class)
+                .setParameter("uid", userId)
+                .setParameter("type", TransactionType.TRANSFER)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList()
+                .forEach(row -> result.merge((Long) row[0], (BigDecimal) row[1], BigDecimal::add));
+        em.createQuery("""
+                        SELECT a.id, COALESCE(SUM(t.amountBase), 0)
+                        FROM Transaction t, Account a
+                        WHERE t.accountId = a.id
+                          AND a.type IN (pe.suarez.finanzas.domain.AccountType.SAVINGS, pe.suarez.finanzas.domain.AccountType.INVESTMENT)
+                          AND t.userId = :uid
+                          AND t.type = :type
+                          AND t.transactionDate BETWEEN :from AND :to
+                        GROUP BY a.id
+                        """, Object[].class)
+                .setParameter("uid", userId)
+                .setParameter("type", TransactionType.TRANSFER)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList()
+                .forEach(row -> result.merge((Long) row[0], ((BigDecimal) row[1]).negate(), BigDecimal::add));
         return result;
     }
 
