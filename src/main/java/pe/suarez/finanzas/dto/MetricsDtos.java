@@ -38,6 +38,9 @@ public final class MetricsDtos {
             int voice,
             /** De esos, los que se guardaron sin corregir nada */
             int voiceFirstTry,
+            /** Registros hechos desde una foto, y cuántos sin corregir */
+            int photo,
+            int photoFirstTry,
             int errors
     ) {}
 }

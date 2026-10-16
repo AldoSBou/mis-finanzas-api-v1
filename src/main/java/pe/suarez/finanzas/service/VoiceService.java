@@ -3,8 +3,12 @@ package pe.suarez.finanzas.service;
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.errors.AnthropicException;
+import com.anthropic.models.messages.Base64ImageSource;
+import com.anthropic.models.messages.ContentBlockParam;
+import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
+import com.anthropic.models.messages.TextBlockParam;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -20,6 +24,8 @@ import pe.suarez.finanzas.security.UserContext;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,9 +33,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Respaldo del intérprete de voz del teléfono: cuando las reglas locales no reconocen la
- * categoría, Claude lee la frase junto con las categorías de la persona y devuelve
- * monto, tipo, categoría y descripción. Solo funciona si hay ANTHROPIC_API_KEY.
+ * Intérprete de gastos con Claude: a partir de lo que la persona dijo (respaldo de las reglas
+ * del teléfono) o de una foto (voucher, boleta, captura de Yape) devuelve monto, tipo,
+ * categoría, descripción y fecha. Solo funciona si hay ANTHROPIC_API_KEY.
  */
 @ApplicationScoped
 public class VoiceService {
@@ -37,12 +43,15 @@ public class VoiceService {
     private static final Logger LOG = Logger.getLogger(VoiceService.class);
 
     private static final String SYSTEM = """
-            Eres el intérprete de voz de una app de gastos personales usada en Perú.
-            Recibes lo que la persona dijo (transcrito por el teléfono, puede tener errores) y la lista de
-            sus categorías con id. Devuelve el monto en soles (si dice "veinte con cincuenta" es 20.50;
-            "mil doscientos" es 1200), el tipo (EXPENSE si gastó o pagó; INCOME si recibió dinero), el id
-            de la categoría más probable (null si ninguna encaja de verdad) y una descripción corta de en
-            qué fue, sin repetir el monto ni el nombre de la categoría. No inventes montos.
+            Eres el intérprete de una app de gastos personales usada en Perú.
+            Recibes la lista de categorías de la persona (con id) y una frase dicha por voz o una foto
+            (voucher de tarjeta, boleta, captura de Yape o Plin, comprobante de transferencia).
+            Devuelve el monto en soles (si dice "veinte con cincuenta" es 20.50; "mil doscientos" es 1200;
+            en una boleta es el TOTAL, no un subtotal ni el vuelto), el tipo (EXPENSE si gastó o pagó;
+            INCOME si recibió dinero, p. ej. "te yapearon"), el id de la categoría más probable (null si
+            ninguna encaja de verdad), una descripción corta (comercio o a quién se pagó, sin repetir el
+            monto ni el nombre de la categoría) y la fecha del comprobante en formato YYYY-MM-DD si se ve,
+            o null. No inventes montos: si no se lee con claridad, devuelve null.
             """;
 
     @ConfigProperty(name = "app.voice.anthropic-key")
@@ -60,9 +69,9 @@ public class VoiceService {
     void init() {
         if (apiKey.isPresent() && !apiKey.get().isBlank()) {
             client = AnthropicOkHttpClient.builder().apiKey(apiKey.get().trim()).build();
-            LOG.infof("Intérprete de voz activo con %s", model);
+            LOG.infof("Intérprete activo con %s", model);
         } else {
-            LOG.info("Intérprete de voz desactivado: falta ANTHROPIC_API_KEY");
+            LOG.info("Intérprete desactivado: falta ANTHROPIC_API_KEY");
         }
     }
 
@@ -70,7 +79,31 @@ public class VoiceService {
         return client != null;
     }
 
+    /** Frase dicha por voz, ya transcrita por el teléfono. */
     public VoiceParseResponse parse(VoiceParseRequest req) {
+        return interpret(List.of(ContentBlockParam.ofText(
+                TextBlockParam.builder().text("La persona dijo: \"" + req.text().trim() + "\"").build())));
+    }
+
+    /** Foto o captura de pantalla (JPEG/PNG/WEBP en base64, ya reducida por el teléfono). */
+    public VoiceParseResponse parseImage(ImageParseRequest req) {
+        Base64ImageSource.MediaType mediaType = switch (req.mediaType() == null ? "" : req.mediaType().toLowerCase()) {
+            case "image/png" -> Base64ImageSource.MediaType.IMAGE_PNG;
+            case "image/webp" -> Base64ImageSource.MediaType.IMAGE_WEBP;
+            case "image/gif" -> Base64ImageSource.MediaType.IMAGE_GIF;
+            default -> Base64ImageSource.MediaType.IMAGE_JPEG;
+        };
+        ImageBlockParam image = ImageBlockParam.builder()
+                .source(Base64ImageSource.builder().mediaType(mediaType).data(req.imageBase64()).build())
+                .build();
+        return interpret(List.of(
+                ContentBlockParam.ofImage(image),
+                ContentBlockParam.ofText(TextBlockParam.builder()
+                        .text("Esta es la foto del comprobante. Saca monto total, tipo, categoría, descripción y fecha.")
+                        .build())));
+    }
+
+    private VoiceParseResponse interpret(List<ContentBlockParam> content) {
         if (client == null) throw new ApiException(ErrorCode.VOICE_UNAVAILABLE);
         Long uid = userContext.userId();
         List<Category> categories = catRepo.list("userId = ?1 AND archived = false ORDER BY type, name", uid);
@@ -79,14 +112,14 @@ public class VoiceService {
         String list = categories.stream()
                 .map(c -> c.id + " = " + c.name + " (" + (c.type == TransactionType.INCOME ? "ingreso" : "gasto") + ")")
                 .collect(Collectors.joining("\n"));
-        String user = "Categorías:\n" + list + "\n\nLa persona dijo: \"" + req.text().trim() + "\"";
 
         StructuredMessageCreateParams<Parsed> params = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(1024L)
                 .system(SYSTEM)
                 .outputConfig(Parsed.class)
-                .addUserMessage(user)
+                .addUserMessage("Categorías:\n" + list)
+                .addUserMessageOfBlockParams(content)
                 .build();
 
         Parsed parsed;
@@ -97,7 +130,7 @@ public class VoiceService {
                     .findFirst()
                     .orElseThrow(() -> new ApiException(ErrorCode.VOICE_UNAVAILABLE, "El modelo no respondió"));
         } catch (AnthropicException e) {
-            LOG.warnf("Intérprete de voz falló: %s", e.getMessage());
+            LOG.warnf("Intérprete falló: %s", e.getMessage());
             throw new ApiException(ErrorCode.VOICE_UNAVAILABLE, "El intérprete no está disponible ahora");
         }
 
@@ -109,7 +142,18 @@ public class VoiceService {
                 ? BigDecimal.valueOf(parsed.amount()).setScale(2, RoundingMode.HALF_UP) : null;
         String description = parsed.description() != null ? parsed.description().trim() : "";
         if (description.length() > 200) description = description.substring(0, 200);
+        LocalDate date = null;
+        if (parsed.date() != null && !parsed.date().isBlank()) {
+            try {
+                date = LocalDate.parse(parsed.date().trim());
+                // Una fecha futura o de hace más de un año es casi seguro una lectura errada
+                if (date.isAfter(LocalDate.now()) || date.isBefore(LocalDate.now().minusYears(1))) date = null;
+            } catch (DateTimeParseException ignored) {
+                // sin fecha
+            }
+        }
 
-        return new VoiceParseResponse(amount, type, cat != null ? cat.id : null, cat != null ? cat.name : null, description);
+        return new VoiceParseResponse(amount, type, cat != null ? cat.id : null, cat != null ? cat.name : null,
+                description, date);
     }
 }

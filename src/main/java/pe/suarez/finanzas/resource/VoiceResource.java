@@ -33,4 +33,11 @@ public class VoiceResource {
     public VoiceParseResponse parse(@Valid VoiceParseRequest req) {
         return service.parse(req);
     }
+
+    /** POST /api/voice/parse-image {"imageBase64": "...", "mediaType": "image/jpeg"} → lo mismo a partir de una foto, más la fecha. */
+    @POST
+    @Path("/parse-image")
+    public VoiceParseResponse parseImage(@Valid ImageParseRequest req) {
+        return service.parseImage(req);
+    }
 }

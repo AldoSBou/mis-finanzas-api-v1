@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public final class VoiceDtos {
 
@@ -15,13 +16,21 @@ public final class VoiceDtos {
             @NotBlank @Size(max = 300) String text
     ) {}
 
-    /** Respuesta al teléfono. {@code amount} y {@code categoryId} pueden ser null si no se entendieron. */
+    /** Foto o captura (JPEG/PNG/WEBP) en base64. El teléfono la reduce antes de mandarla (máx. ~1 MB). */
+    public record ImageParseRequest(
+            @NotBlank @Size(max = 4_000_000) String imageBase64,
+            @Size(max = 30) String mediaType
+    ) {}
+
+    /** Respuesta al teléfono. {@code amount}, {@code categoryId} y {@code date} pueden ser null si no se entendieron. */
     public record VoiceParseResponse(
             BigDecimal amount,
             String type,
             Long categoryId,
             String categoryName,
-            String description
+            String description,
+            /** Fecha del comprobante (fotos); null si no se ve o es la de hoy */
+            LocalDate date
     ) {}
 
     /** Esquema que debe devolver el modelo (salida estructurada). */
@@ -32,7 +41,9 @@ public final class VoiceDtos {
             String type,
             @JsonPropertyDescription("id de la categoría más probable de la lista dada, o null si ninguna encaja.")
             Long categoryId,
-            @JsonPropertyDescription("Descripción corta (máx. 60 caracteres) de en qué fue, sin el monto ni el nombre de la categoría. Vacía si no aporta nada.")
-            String description
+            @JsonPropertyDescription("Descripción corta (máx. 60 caracteres) de en qué fue o a quién se pagó, sin el monto ni el nombre de la categoría. Vacía si no aporta nada.")
+            String description,
+            @JsonPropertyDescription("Fecha del comprobante en formato YYYY-MM-DD si se ve en la imagen; null si no se ve o si es una frase de voz.")
+            String date
     ) {}
 }
