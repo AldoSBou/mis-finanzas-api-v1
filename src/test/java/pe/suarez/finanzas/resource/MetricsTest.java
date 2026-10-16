@@ -30,17 +30,21 @@ class MetricsTest {
                         entry(4000, "app"),
                         entry(8000, "notification"),
                         entry(12000, "app"),
+                        entry(3000, "voice"),
+                        entry(6000, "voice-edited"),
                         entry(500_000, "app"), // la app quedó abierta: no cuenta
                         Map.of("kind", "ERROR", "source", "save", "message", "Sin conexión",
                                 "occurredAt", Instant.now().toString())))
                 .post("/api/metrics/events").then().statusCode(201)
-                .body("data.accepted", equalTo(5));
+                .body("data.accepted", equalTo(7));
 
         as(token).get("/api/metrics/summary?days=7").then().statusCode(200)
-                .body("data.entries", equalTo(3))
-                .body("data.medianMs", equalTo(8000))
-                .body("data.under10Pct", equalTo(67))
+                .body("data.entries", equalTo(5))
+                .body("data.medianMs", equalTo(6000))
+                .body("data.under10Pct", equalTo(80))
                 .body("data.fromNotification", equalTo(1))
+                .body("data.voice", equalTo(2))
+                .body("data.voiceFirstTry", equalTo(1))
                 .body("data.errors", equalTo(1));
 
         // Otro usuario no ve nada
@@ -56,6 +60,14 @@ class MetricsTest {
                 .post("/api/metrics/events").then().statusCode(400);
         as(token).body(List.of(Map.of("kind", "NOPE", "occurredAt", Instant.now().toString())))
                 .post("/api/metrics/events").then().statusCode(400);
+    }
+
+    @Test
+    void voiceParserIsUnavailableWithoutKey() {
+        String token = register();
+        as(token).get("/api/voice").then().statusCode(200).body("data.available", equalTo(false));
+        as(token).body(Map.of("text", "veinte con cincuenta almuerzo")).post("/api/voice/parse")
+                .then().statusCode(503).body("error.code", equalTo("VOICE_UNAVAILABLE"));
     }
 
     @Test

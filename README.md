@@ -102,6 +102,7 @@ Flyway aplicará las migraciones automáticamente.
 | `GET/POST` | `/api/commitments` | Compromisos de pago (alquiler, colegio, deuda de tarjeta...) |
 | `PUT/DELETE` | `/api/commitments/{id}` | Editar / eliminar |
 | `POST` | `/api/commitments/{id}/pay` · `/skip` · `/reopen` | Pagar (registra el gasto o el "mover dinero"), omitir o reabrir |
+| `GET` | `/api/voice` · `POST /api/voice/parse` | Respaldo del registro por voz con Claude (requiere `ANTHROPIC_API_KEY`; sin ella, 503) |
 | `POST` | `/api/metrics/events` | Lote de eventos de la app móvil: cuánto tardó cada registro (ENTRY) y errores vistos (ERROR) |
 | `GET` | `/api/metrics/summary?days=30` | Velocidad de registro de la persona: mediana, % en menos de 10 s, errores |
 

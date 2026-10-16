@@ -55,6 +55,9 @@ public enum ErrorCode {
     COMMITMENT_NOT_FOUND(404),
     COMMITMENT_INVALID(400),
 
+    // Voz
+    VOICE_UNAVAILABLE(503),
+
     // Reglas
     RULE_NOT_FOUND(404),
     RULE_TEMPLATE_LOCKED(400),

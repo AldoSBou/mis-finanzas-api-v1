@@ -134,6 +134,11 @@ public final class ErrorCatalog {
                 "Operación no válida para el compromiso",
                 "Revisa el detalle: categoría, cuenta o estado del compromiso.");
 
+        // Voz
+        register(ErrorCode.VOICE_UNAVAILABLE,
+                "Intérprete de voz no disponible",
+                "El servidor no tiene configurado el intérprete o no respondió. Elige la categoría a mano.");
+
         // Tarjetas
         register(ErrorCode.CARD_INVALID,
                 "Operación no válida para la tarjeta",

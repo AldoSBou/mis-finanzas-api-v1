@@ -68,13 +68,15 @@ public class MetricsService {
                 .getSingleResult();
 
         int n = entries.size();
-        if (n == 0) return new MetricsSummary(days, 0, null, null, 0, (int) errors);
+        if (n == 0) return new MetricsSummary(days, 0, null, null, 0, 0, 0, (int) errors);
 
         int[] ms = entries.stream().mapToInt(e -> (Integer) e[0]).toArray();
         int median = n % 2 == 1 ? ms[n / 2] : (ms[n / 2 - 1] + ms[n / 2]) / 2;
         long under10 = entries.stream().filter(e -> (Integer) e[0] < 10_000).count();
         long fromNotification = entries.stream().filter(e -> "notification".equals(e[1])).count();
+        long voiceFirstTry = entries.stream().filter(e -> "voice".equals(e[1])).count();
+        long voiceEdited = entries.stream().filter(e -> "voice-edited".equals(e[1])).count();
         return new MetricsSummary(days, n, median, (int) Math.round(under10 * 100.0 / n),
-                (int) fromNotification, (int) errors);
+                (int) fromNotification, (int) (voiceFirstTry + voiceEdited), (int) voiceFirstTry, (int) errors);
     }
 }

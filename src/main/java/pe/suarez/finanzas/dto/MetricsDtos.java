@@ -34,6 +34,10 @@ public final class MetricsDtos {
             Integer medianMs,
             Integer under10Pct,
             int fromNotification,
+            /** Registros hechos por voz (aceptados tal cual o corregidos) */
+            int voice,
+            /** De esos, los que se guardaron sin corregir nada */
+            int voiceFirstTry,
             int errors
     ) {}
 }
