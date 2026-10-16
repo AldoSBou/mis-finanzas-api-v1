@@ -88,6 +88,13 @@ final class TestApi {
         return id.longValue();
     }
 
+    /** Cuenta "Ahorros" (SAVINGS) del usuario; se crea la primera vez. Los usuarios nuevos solo tienen "Principal". */
+    static long savingsAccount(String token) {
+        Number id = as(token).get("/api/accounts").then().statusCode(200)
+                .extract().path("data.find { it.name == 'Ahorros' }?.id");
+        return id != null ? id.longValue() : createAccount(token, "Ahorros", "SAVINGS", "PEN", "0");
+    }
+
     static long accountId(String token, String name) {
         Number id = as(token).get("/api/accounts").then().statusCode(200)
                 .extract().path("data.find { it.name == '" + name + "' }.id");

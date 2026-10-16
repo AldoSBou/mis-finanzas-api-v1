@@ -18,7 +18,7 @@ class CategoryBudgetTest {
     @Test
     void statusFollowsSpentVersusLimit() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long restaurantes = categoryId(token, "Restaurantes");
         long ropa = categoryId(token, "Ropa");
         long entretenimiento = categoryId(token, "Entretenimiento");
@@ -50,7 +50,7 @@ class CategoryBudgetTest {
     @Test
     void scheduledRecurringExpenseWarnsBeforeSpending() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long vivienda = categoryId(token, "Vivienda");
         setLimit(token, vivienda, "1000");
 

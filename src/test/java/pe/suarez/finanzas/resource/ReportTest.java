@@ -15,8 +15,8 @@ class ReportTest {
     @Test
     void monthlyTotalsAndNetWorthOverTime() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
-        long ahorros = accountId(token, "Ahorros");
+        long efectivo = accountId(token, "Principal");
+        long ahorros = savingsAccount(token);
         LocalDate lastMonth = LocalDate.now().minusMonths(1).withDayOfMonth(1);
 
         // Mes pasado: sueldo 3000, comida 800, ahorro 500

@@ -17,8 +17,8 @@ class AccountsAndTransfersTest {
     @Test
     void transferToSavingsCountsAsSavingsNotExpense() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
-        long ahorros = accountId(token, "Ahorros");
+        long efectivo = accountId(token, "Principal");
+        long ahorros = savingsAccount(token);
 
         createTx(token, tx("INCOME", efectivo, "3000").with("categoryId", categoryId(token, "Salario")));
         createTx(token, tx("EXPENSE", efectivo, "500").with("categoryId", categoryId(token, "Alimentación")));
@@ -40,7 +40,7 @@ class AccountsAndTransfersTest {
         as(token).get("/api/transactions?period=" + PERIOD + "&accountId=" + ahorros).then().statusCode(200)
                 .body("data", hasSize(1))
                 .body("data[0].type", equalTo("TRANSFER"))
-                .body("data[0].accountName", equalTo("Efectivo"))
+                .body("data[0].accountName", equalTo("Principal"))
                 .body("data[0].toAccountName", equalTo("Ahorros"));
     }
 
@@ -72,7 +72,7 @@ class AccountsAndTransfersTest {
     @Test
     void crossCurrencyTransferUsesImpliedRate() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long usd = createAccount(token, "Dólares", "CASH", "USD", "1000");
 
         as(token).body(tx("TRANSFER", usd, "100").with("toAccountId", efectivo).with("toAmount", "372"))
@@ -104,8 +104,8 @@ class AccountsAndTransfersTest {
     @Test
     void legacySavingsCategoryAndWithdrawals() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
-        long ahorros = accountId(token, "Ahorros");
+        long efectivo = accountId(token, "Principal");
+        long ahorros = savingsAccount(token);
 
         as(token).body(tx("TRANSFER", efectivo, "10").with("toAccountId", efectivo))
                 .post("/api/transactions").then().statusCode(400)
@@ -132,7 +132,7 @@ class AccountsAndTransfersTest {
     @Test
     void archivedAccountsAndCurrencyLock() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long cuenta = createAccount(token, "Interbank", "BANK", "PEN", "0");
         long otros = categoryId(token, "Otros");
 

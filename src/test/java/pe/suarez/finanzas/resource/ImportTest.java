@@ -105,7 +105,7 @@ class ImportTest {
         String other = register();
         as(other).get("/api/categorization-rules").then().statusCode(200).body("data", empty());
         as(other).delete("/api/categorization-rules/" + id.longValue()).then().statusCode(404);
-        as(other).body(Map.of("accountId", accountId(token, "Efectivo"), "rows", List.of(row(D1, "x", "-1"))))
+        as(other).body(Map.of("accountId", accountId(token, "Principal"), "rows", List.of(row(D1, "x", "-1"))))
                 .post("/api/imports/preview").then().statusCode(404);
 
         as(token).delete("/api/categorization-rules/" + id.longValue()).then().statusCode(204);

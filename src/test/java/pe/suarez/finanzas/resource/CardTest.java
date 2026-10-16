@@ -45,7 +45,7 @@ class CardTest {
     @Test
     void statementTracksPaymentsMadeAfterClosing() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long visa = createCard(token, "Visa", "5000", 20, 15);
         createTx(token, tx("INCOME", efectivo, "3000").with("categoryId", categoryId(token, "Salario")));
         createTx(token, tx("EXPENSE", visa, "1200").with("categoryId", categoryId(token, "Alimentación"))
@@ -83,7 +83,7 @@ class CardTest {
     @Test
     void unpaidStatementPastDueIsOverdueOrMinimumPaid() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long visa = createCard(token, "Visa", null, null, null);
         long amex = createCard(token, "Amex", null, null, null);
         createTx(token, tx("INCOME", efectivo, "3000").with("categoryId", categoryId(token, "Salario")));
@@ -143,7 +143,7 @@ class CardTest {
     @Test
     void onlyCardExpensesCanHaveInstallments() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long visa = createCard(token, "Visa", null, null, null);
         long enEfectivo = createExpense(token, efectivo, "300", "Zapatillas");
         as(token).body(Map.of("installments", 3)).put("/api/transactions/" + enEfectivo + "/installments")

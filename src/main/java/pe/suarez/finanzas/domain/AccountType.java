@@ -6,6 +6,7 @@ package pe.suarez.finanzas.domain;
  * cuenta como ahorro del mes en el dashboard, no como gasto.
  */
 public enum AccountType {
+    GENERAL,        // "Todo mi dinero": la única cuenta de quien no separa cuentas
     CASH,           // Efectivo
     BANK,           // Cuenta bancaria / débito
     CREDIT_CARD,    // Tarjeta de crédito (saldo negativo = deuda)

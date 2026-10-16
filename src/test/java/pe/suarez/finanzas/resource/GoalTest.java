@@ -18,8 +18,8 @@ class GoalTest {
     @Test
     void contributionsFromAnotherAccountTransferMoneyAndCountAsSavings() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
-        long ahorros = accountId(token, "Ahorros");
+        long efectivo = accountId(token, "Principal");
+        long ahorros = savingsAccount(token);
         createTx(token, tx("INCOME", efectivo, "5000").with("categoryId", categoryId(token, "Salario")));
 
         long viaje = createGoal(token, "Viaje a Cusco", "3000", ahorros, null);
@@ -70,7 +70,7 @@ class GoalTest {
     @Test
     void monthlyNeededToReachTheTargetDate() {
         String token = register();
-        long ahorros = accountId(token, "Ahorros");
+        long ahorros = savingsAccount(token);
         LocalDate target = YearMonth.now().plusMonths(3).atEndOfMonth();
         long months = ChronoUnit.MONTHS.between(YearMonth.now(), YearMonth.from(target)) + 1; // 4
 
@@ -84,8 +84,8 @@ class GoalTest {
     @Test
     void deletingTheTransferRemovesTheContributionAndEditingKeepsItInSync() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
-        long ahorros = accountId(token, "Ahorros");
+        long efectivo = accountId(token, "Principal");
+        long ahorros = savingsAccount(token);
         long goal = createGoal(token, "Viaje", "1000", ahorros, null);
 
         Number txId = contribute(token, goal, "IN", "300", efectivo).then().statusCode(201)
@@ -104,7 +104,7 @@ class GoalTest {
     @Test
     void goalsBelongToTheirOwner() {
         String token = register();
-        long goal = createGoal(token, "Privada", "100", accountId(token, "Ahorros"), null);
+        long goal = createGoal(token, "Privada", "100", savingsAccount(token), null);
         String other = register();
         as(other).get("/api/goals").then().statusCode(200).body("data.goals", empty());
         as(other).get("/api/goals/" + goal + "/contributions").then().statusCode(404)

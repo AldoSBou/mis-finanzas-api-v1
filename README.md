@@ -66,7 +66,7 @@ Flyway aplicará las migraciones automáticamente.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `POST` | `/api/auth/register` | Registra un usuario y siembra categorías + reglas plantilla |
+| `POST` | `/api/auth/register` | Registra un usuario y siembra la cuenta "Principal", categorías y reglas plantilla |
 | `POST` | `/api/auth/login` | Devuelve JWT |
 | `GET` | `/api/auth/me` | Datos del usuario autenticado |
 | `GET` | `/api/categories` | Lista categorías del usuario |
@@ -97,6 +97,8 @@ Flyway aplicará las migraciones automáticamente.
 | `GET` | `/api/budgets?period=2026-04` | Presupuesto del mes |
 | `POST` | `/api/budgets` | Upsert presupuesto del mes |
 | `GET` | `/api/dashboard?period=2026-04` | **Resumen completo del panel principal** |
+| `POST` | `/api/metrics/events` | Lote de eventos de la app móvil: cuánto tardó cada registro (ENTRY) y errores vistos (ERROR) |
+| `GET` | `/api/metrics/summary?days=30` | Velocidad de registro de la persona: mediana, % en menos de 10 s, errores |
 
 ## Decisiones de diseño
 

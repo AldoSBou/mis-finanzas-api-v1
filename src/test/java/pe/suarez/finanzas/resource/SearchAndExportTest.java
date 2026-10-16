@@ -19,7 +19,7 @@ class SearchAndExportTest {
     @Test
     void filtersCombineAcrossHistory() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long transporte = categoryId(token, "Transporte");
         long comida = categoryId(token, "Alimentación");
         String lastYear = LocalDate.now().minusYears(1).toString();
@@ -51,13 +51,13 @@ class SearchAndExportTest {
     @Test
     void exportsFilteredCsvForExcel() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long comida = categoryId(token, "Alimentación");
         createTx(token, tx("EXPENSE", efectivo, "35.50").with("categoryId", comida)
                 .with("description", "Tambo, San Isidro"));
         createTx(token, tx("EXPENSE", efectivo, "10").with("categoryId", comida)
                 .with("description", "=HYPERLINK(\"x\")"));
-        createTx(token, tx("TRANSFER", efectivo, "100").with("toAccountId", accountId(token, "Ahorros")));
+        createTx(token, tx("TRANSFER", efectivo, "100").with("toAccountId", savingsAccount(token)));
 
         byte[] body = as(token).get("/api/transactions/export?" + ALL + "&type=EXPENSE")
                 .then().statusCode(200)
@@ -80,7 +80,7 @@ class SearchAndExportTest {
         given().get("/api/transactions/export").then().statusCode(401);
 
         String alice = register();
-        createTx(alice, tx("EXPENSE", accountId(alice, "Efectivo"), "50")
+        createTx(alice, tx("EXPENSE", accountId(alice, "Principal"), "50")
                 .with("categoryId", categoryId(alice, "Otros")).with("description", "privado"));
         String bob = register();
         String csv = as(bob).get("/api/transactions/export?" + ALL).then().statusCode(200)

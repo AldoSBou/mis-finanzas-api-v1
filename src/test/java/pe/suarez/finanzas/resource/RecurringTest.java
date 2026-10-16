@@ -30,7 +30,7 @@ class RecurringTest {
     @Test
     void autoRecurringCatchesUpMissedOccurrences() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         LocalDate start = TODAY.minusMonths(2);
 
         long id = createRecurring(token, recurring("EXPENSE", efectivo, "100", start, true)
@@ -52,7 +52,7 @@ class RecurringTest {
     @Test
     void manualRecurringIsPendingUntilRegistered() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long luz = createRecurring(token, recurring("EXPENSE", efectivo, "120", TODAY, false)
                 .with("categoryId", categoryId(token, "Servicios"))
                 .with("description", "Luz"));
@@ -74,7 +74,7 @@ class RecurringTest {
     @Test
     void skipAdvancesWithoutCreatingTransaction() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long id = createRecurring(token, recurring("INCOME", efectivo, "500", TODAY, false)
                 .with("categoryId", categoryId(token, "Freelance")));
 
@@ -87,8 +87,8 @@ class RecurringTest {
     @Test
     void recurringTransferToSavingsCountsInProjection() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
-        long ahorros = accountId(token, "Ahorros");
+        long efectivo = accountId(token, "Principal");
+        long ahorros = savingsAccount(token);
         // Mañana (si hoy es fin de mes, cae el mes siguiente y no entra en la proyección)
         LocalDate tomorrow = TODAY.plusDays(1);
         createRecurring(token, recurring("TRANSFER", efectivo, "300", tomorrow, true)
@@ -102,7 +102,7 @@ class RecurringTest {
     @Test
     void invalidRecurringIsRejected() {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         as(token).body(recurring("EXPENSE", efectivo, "10", TODAY, true))
                 .post("/api/recurring").then().statusCode(400)
                 .body("error.code", equalTo("TRANSACTION_CATEGORY_REQUIRED"));
@@ -111,7 +111,7 @@ class RecurringTest {
     @Test
     void concurrentLoadsDoNotDuplicateOccurrences() throws Exception {
         String token = register();
-        long efectivo = accountId(token, "Efectivo");
+        long efectivo = accountId(token, "Principal");
         long id = createRecurring(token, recurring("EXPENSE", efectivo, "10", TODAY, true)
                 .with("categoryId", categoryId(token, "Suscripciones")));
         assertEquals(1L, countByRecurring(id));
