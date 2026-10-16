@@ -25,6 +25,12 @@ import java.util.stream.Collectors;
  * billetera) y lo que entra y sale de ellas en cada fecha. El pago de la tarjeta sale el
  * día de vencimiento, no al comprar. Las compras del ciclo que aún no tiene estado de
  * cuenta no se proyectan.
+ *
+ * Cada moneda se proyecta por separado y nada se convierte: los soles responden si alcanzan
+ * los soles y los dólares si alcanzan los dólares. Una tarjeta en dólares pesa en la
+ * proyección en dólares aunque no haya cuenta en esa moneda (así se ve lo que habrá que
+ * conseguir). El tipo de cambio solo interviene donde el dinero cruza de moneda: una
+ * transferencia recurrente entre cuentas de distinta moneda usa sus propios montos.
  */
 @ApplicationScoped
 public class LiquidityService {
@@ -37,7 +43,6 @@ public class LiquidityService {
     @Inject RecurringService recurringService;
     @Inject CommitmentService commitmentService;
     @Inject CardService cardService;
-    @Inject TransactionService txService;
     @Inject EntityManager em;
     @Inject UserContext userContext;
 
@@ -49,49 +54,56 @@ public class LiquidityService {
         LocalDate periodEnd = OverviewService.periodFor(today, user.periodStartDay)[1];
         LocalDate horizonEnd = OverviewService.periodFor(periodEnd.plusDays(1), user.periodStartDay)[1];
 
-        // Saldo líquido de hoy
+        // Saldo líquido de hoy, por moneda
         List<Account> all = accountRepo.listForUser(uid, false);
         Map<Long, Account> byId = all.stream().collect(Collectors.toMap(a -> a.id, Function.identity()));
         Map<Long, BigDecimal> movements = accountRepo.movementTotals(uid);
-        List<LiquidAccount> liquid = new ArrayList<>();
-        BigDecimal opening = BigDecimal.ZERO;
+        Map<String, List<LiquidAccount>> accounts = new HashMap<>();
         for (Account a : all) {
             if (!LIQUID.contains(a.type)) continue;
             BigDecimal balance = a.initialBalance.add(movements.getOrDefault(a.id, BigDecimal.ZERO));
-            BigDecimal rate = a.currency.equals(base) ? BigDecimal.ONE
-                    : txService.latestRate(a.currency).map(r -> r.rate()).orElse(null);
-            BigDecimal inBase = rate != null ? balance.multiply(rate).setScale(2, RoundingMode.HALF_UP) : null;
-            if (inBase != null) opening = opening.add(inBase);
-            liquid.add(new LiquidAccount(a.id, a.name, a.currency, balance, inBase, rate));
+            accounts.computeIfAbsent(a.currency, k -> new ArrayList<>())
+                    .add(new LiquidAccount(a.id, a.name, a.currency, balance));
         }
 
-        // Entradas y salidas previstas
-        List<LiquidityEvent> events = new ArrayList<>();
+        // Entradas y salidas previstas, cada una en la moneda de la cuenta que toca
+        Map<String, List<LiquidityEvent>> events = new HashMap<>();
         for (UpcomingItem u : recurringService.upcoming(uid, horizonEnd)) {
             Account from = u.accountId() != null ? byId.get(u.accountId()) : null;
             Account to = u.toAccountId() != null ? byId.get(u.toAccountId()) : null;
             boolean fromLiquid = from != null && LIQUID.contains(from.type);
             boolean toLiquid = to != null && LIQUID.contains(to.type);
-            BigDecimal effect = switch (u.type()) {
-                case INCOME -> fromLiquid ? u.amountBase() : BigDecimal.ZERO;
-                case EXPENSE -> fromLiquid ? u.amountBase().negate() : BigDecimal.ZERO;
-                case TRANSFER -> fromLiquid == toLiquid ? BigDecimal.ZERO
-                        : fromLiquid ? u.amountBase().negate() : u.amountBase();
-            };
-            if (effect.signum() == 0) continue;
             LocalDate date = u.date().isBefore(today) ? today : u.date();
             String name = u.description() != null ? u.description()
                     : u.categoryName() != null ? u.categoryName()
                     : u.type() == TransactionType.TRANSFER ? (to != null ? "→ " + to.name : "Transferencia") : "Recurrente";
-            events.add(new LiquidityEvent(date, "RECURRING", u.recurringId(), name, effect));
+            switch (u.type()) {
+                case INCOME -> {
+                    if (fromLiquid) add(events, from.currency, new LiquidityEvent(date, "RECURRING", u.recurringId(), name, u.amount()));
+                }
+                case EXPENSE -> {
+                    if (fromLiquid) add(events, from.currency, new LiquidityEvent(date, "RECURRING", u.recurringId(), name, u.amount().negate()));
+                }
+                case TRANSFER -> {
+                    // Entre dos cuentas líquidas de la misma moneda el efectivo no cambia
+                    if (fromLiquid && toLiquid && from.currency.equals(to.currency)) continue;
+                    if (fromLiquid) add(events, from.currency, new LiquidityEvent(date, "RECURRING", u.recurringId(), name, u.amount().negate()));
+                    if (toLiquid && u.toAmount() != null) {
+                        add(events, to.currency, new LiquidityEvent(date, "RECURRING", u.recurringId(),
+                                from != null ? from.name + " →" : name, u.toAmount()));
+                    }
+                }
+            }
         }
-        List<Commitment> pending = commitmentService.pending(uid);
         Set<Long> commitmentCards = new HashSet<>();
-        for (Commitment c : pending) {
+        for (Commitment c : commitmentService.pending(uid)) {
             if (c.dueDate.isAfter(horizonEnd)) continue;
-            LocalDate date = c.dueDate.isBefore(today) ? today : c.dueDate;
-            events.add(new LiquidityEvent(date, "COMMITMENT", c.id, c.name, c.amount.negate()));
             if (c.toAccountId != null) commitmentCards.add(c.toAccountId);
+            Account from = c.accountId != null ? byId.get(c.accountId) : null;
+            if (from != null && !LIQUID.contains(from.type)) continue; // se paga desde ahorro: no toca el efectivo
+            String currency = from != null ? from.currency : base;
+            LocalDate date = c.dueDate.isBefore(today) ? today : c.dueDate;
+            add(events, currency, new LiquidityEvent(date, "COMMITMENT", c.id, c.name, c.amount.negate()));
         }
         for (CardSummary card : cardService.summaries()) {
             var s = card.latestStatement();
@@ -99,19 +111,42 @@ public class LiquidityService {
             if (commitmentCards.contains(card.accountId())) continue; // ya está como compromiso
             LocalDate due = s.dueDate() != null ? s.dueDate() : card.nextDueDate();
             if (due == null || due.isAfter(horizonEnd)) continue;
-            BigDecimal rate = card.currency().equals(base) ? BigDecimal.ONE
-                    : txService.latestRate(card.currency()).map(r -> r.rate()).orElse(BigDecimal.ONE);
-            BigDecimal amount = s.remaining().multiply(rate).setScale(2, RoundingMode.HALF_UP);
-            events.add(new LiquidityEvent(due.isBefore(today) ? today : due, "CARD", card.accountId(),
-                    "Pago " + card.name(), amount.negate()));
+            add(events, card.currency(), new LiquidityEvent(due.isBefore(today) ? today : due, "CARD",
+                    card.accountId(), "Pago " + card.name(), s.remaining().negate()));
         }
-        events.sort(Comparator.comparing(LiquidityEvent::date));
 
-        // Gasto variable diario: lo de los últimos 28 días que no fue recurrente, compromiso ni tarjeta
-        BigDecimal estimated = variableDaily(uid, today);
-        BigDecimal daily = dailyOverride != null && dailyOverride.signum() >= 0 ? dailyOverride : estimated;
+        // Gasto variable diario por moneda: lo de los últimos 28 días que no fue recurrente, compromiso ni tarjeta
+        Map<String, BigDecimal> estimated = variableDaily(uid, today);
 
-        // Proyección día a día
+        // Una proyección por moneda: la base primero, luego las demás en orden
+        List<String> currencies = new ArrayList<>();
+        currencies.add(base);
+        new TreeSet<>(accounts.keySet()).forEach(c -> { if (!currencies.contains(c)) currencies.add(c); });
+        new TreeSet<>(events.keySet()).forEach(c -> { if (!currencies.contains(c)) currencies.add(c); });
+
+        List<CurrencyProjection> projections = new ArrayList<>();
+        for (String currency : currencies) {
+            List<LiquidAccount> accs = accounts.getOrDefault(currency, List.of());
+            List<LiquidityEvent> evs = new ArrayList<>(events.getOrDefault(currency, List.of()));
+            evs.sort(Comparator.comparing(LiquidityEvent::date));
+            BigDecimal opening = accs.stream().map(LiquidAccount::balance).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal est = estimated.getOrDefault(currency, BigDecimal.ZERO);
+            BigDecimal daily = currency.equals(base) && dailyOverride != null && dailyOverride.signum() >= 0
+                    ? dailyOverride : est;
+            projections.add(project(currency, accs, opening, est, daily, evs, today, horizonEnd));
+        }
+        return new LiquidityResponse(today, periodEnd, horizonEnd, base, projections);
+    }
+
+    private static void add(Map<String, List<LiquidityEvent>> events, String currency, LiquidityEvent e) {
+        if (e.amount().signum() == 0) return;
+        events.computeIfAbsent(currency, k -> new ArrayList<>()).add(e);
+    }
+
+    /** Proyección día a día de una moneda. */
+    private static CurrencyProjection project(String currency, List<LiquidAccount> accs, BigDecimal opening,
+                                              BigDecimal estimated, BigDecimal daily, List<LiquidityEvent> events,
+                                              LocalDate today, LocalDate horizonEnd) {
         List<LiquidityDay> days = new ArrayList<>();
         LiquidityDay lowest = null;
         LocalDate firstNegative = null;
@@ -129,16 +164,18 @@ public class LiquidityService {
             if (lowest == null || balance.compareTo(lowest.balance()) < 0) lowest = day;
             if (firstNegative == null && balance.signum() < 0) firstNegative = d;
         }
-
-        return new LiquidityResponse(today, periodEnd, horizonEnd, base, liquid, opening,
-                estimated, daily, events, days, lowest, firstNegative, days.get(days.size() - 1).balance());
+        return new CurrencyProjection(currency, accs, opening, estimated, daily, events, days, lowest,
+                firstNegative, days.get(days.size() - 1).balance());
     }
 
-    /** Promedio diario de gastos de cuentas líquidas en los últimos 28 días, sin recurrentes ni compromisos pagados. */
-    private BigDecimal variableDaily(Long uid, LocalDate today) {
+    /**
+     * Promedio diario de gastos de cuentas líquidas en los últimos 28 días, por moneda de la
+     * cuenta (en esa moneda, sin convertir), sin recurrentes ni compromisos pagados.
+     */
+    private Map<String, BigDecimal> variableDaily(Long uid, LocalDate today) {
         LocalDate from = today.minusDays(VARIABLE_WINDOW_DAYS - 1);
-        BigDecimal total = em.createQuery("""
-                        SELECT COALESCE(SUM(t.amountBase), 0)
+        List<Object[]> rows = em.createQuery("""
+                        SELECT a.currency, COALESCE(SUM(t.amount), 0)
                         FROM Transaction t, Account a
                         WHERE t.accountId = a.id
                           AND t.userId = :uid
@@ -147,14 +184,19 @@ public class LiquidityService {
                           AND a.type IN (:liquid)
                           AND t.transactionDate BETWEEN :from AND :to
                           AND t.id NOT IN (SELECT c.paidTransactionId FROM Commitment c WHERE c.userId = :uid AND c.paidTransactionId IS NOT NULL)
-                        """, BigDecimal.class)
+                        GROUP BY a.currency
+                        """, Object[].class)
                 .setParameter("uid", uid)
                 .setParameter("type", TransactionType.EXPENSE)
                 .setParameter("liquid", LIQUID)
                 .setParameter("from", from)
                 .setParameter("to", today)
-                .getSingleResult();
-        return (total != null ? total : BigDecimal.ZERO)
-                .divide(BigDecimal.valueOf(VARIABLE_WINDOW_DAYS), 2, RoundingMode.HALF_UP);
+                .getResultList();
+        Map<String, BigDecimal> result = new HashMap<>();
+        for (Object[] r : rows) {
+            BigDecimal total = r[1] != null ? (BigDecimal) r[1] : BigDecimal.ZERO;
+            result.put((String) r[0], total.divide(BigDecimal.valueOf(VARIABLE_WINDOW_DAYS), 2, RoundingMode.HALF_UP));
+        }
+        return result;
     }
 }

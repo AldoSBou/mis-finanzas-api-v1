@@ -127,6 +127,7 @@ public class RecurringService {
             Account to = r.toAccountId != null ? accounts.get(r.toAccountId) : null;
             Category c = r.categoryId != null ? categories.get(r.categoryId) : null;
             BigDecimal amountBase = baseAmount(r, from, to, base);
+            BigDecimal toAmount = toAmount(r, from, to, base);
             LocalDate d = r.nextDate;
             for (int n = 0; n < MAX_UPCOMING && !d.isAfter(until)
                     && (r.endDate == null || !d.isAfter(r.endDate)); n++) {
@@ -134,7 +135,7 @@ public class RecurringService {
                         c != null ? c.name : null,
                         from != null ? from.name : null,
                         to != null ? to.name : null,
-                        r.amount, from != null ? from.currency : base, amountBase,
+                        r.amount, from != null ? from.currency : base, amountBase, toAmount,
                         d, !d.isAfter(today), r.autoCreate));
                 d = r.frequency.next(d, r.anchorDay);
             }
@@ -228,6 +229,21 @@ public class RecurringService {
         if (to != null && to.currency.equals(base) && r.toAmount != null) return r.toAmount;
         BigDecimal rate = r.exchangeRate != null ? r.exchangeRate : BigDecimal.ONE;
         return r.amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Lo que entra a la cuenta destino de una transferencia, en su moneda: el monto destino si
+     * se indicó; el mismo monto si ambas cuentas comparten moneda; o la conversión con el tipo de
+     * cambio del recurrente si el destino está en la base. Si no se puede saber, null.
+     */
+    private static BigDecimal toAmount(RecurringTransaction r, Account from, Account to, String base) {
+        if (r.type != TransactionType.TRANSFER || to == null) return null;
+        if (r.toAmount != null) return r.toAmount;
+        if (from == null || from.currency.equals(to.currency)) return r.amount;
+        if (to.currency.equals(base) && r.exchangeRate != null) {
+            return r.amount.multiply(r.exchangeRate).setScale(2, RoundingMode.HALF_UP);
+        }
+        return null;
     }
 
     private RecurringTransaction find(Long id, Long uid) {

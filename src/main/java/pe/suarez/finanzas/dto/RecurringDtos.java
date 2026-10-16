@@ -74,6 +74,8 @@ public final class RecurringDtos {
             BigDecimal amount,
             String currency,
             BigDecimal amountBase,
+            /** Lo que llega a la cuenta destino en su moneda (solo transferencias); null si no se conoce */
+            BigDecimal toAmount,
             LocalDate date,
             boolean overdue,
             boolean autoCreate
