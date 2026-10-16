@@ -14,6 +14,8 @@ public enum ErrorCode {
     UNSUPPORTED_MEDIA_TYPE(415),
     RATE_LIMIT_EXCEEDED(429),
     INTERNAL_ERROR(500),
+    /** La base de datos no responde (en Railway Free se duerme y tarda unos segundos en despertar) */
+    DATABASE_UNAVAILABLE(503),
 
     // Auth específicos
     AUTH_INVALID_CREDENTIALS(401),

@@ -78,8 +78,15 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
                 message = wae.getMessage() != null ? wae.getMessage() : ErrorCatalog.message(code);
             }
             default -> {
-                LOG.errorf(ex, "Error no manejado [requestId=%s]", MDC.get("requestId"));
-                code = ErrorCode.INTERNAL_ERROR;
+                if (databaseUnreachable(ex)) {
+                    // Railway Free duerme Postgres: la primera conexión tras despertar se rechaza.
+                    // Nada se ejecutó, así que el cliente puede reintentar sin riesgo.
+                    LOG.warnf("Base de datos no disponible [requestId=%s]: %s", MDC.get("requestId"), rootCause(ex).getMessage());
+                    code = ErrorCode.DATABASE_UNAVAILABLE;
+                } else {
+                    LOG.errorf(ex, "Error no manejado [requestId=%s]", MDC.get("requestId"));
+                    code = ErrorCode.INTERNAL_ERROR;
+                }
                 message = ErrorCatalog.message(code);
             }
         }
@@ -92,6 +99,26 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
                 .type(MediaType.APPLICATION_JSON)
                 .entity(body)
                 .build();
+    }
+
+    /** Conexión rechazada o caída antes de ejecutar nada (SQLSTATE 08xxx, ConnectException, timeout de socket). */
+    private static boolean databaseUnreachable(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof java.net.ConnectException || t instanceof java.net.SocketTimeoutException
+                    || t instanceof java.net.UnknownHostException) {
+                return true;
+            }
+            if (t instanceof java.sql.SQLException sql && sql.getSQLState() != null && sql.getSQLState().startsWith("08")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Throwable rootCause(Throwable ex) {
+        Throwable t = ex;
+        while (t.getCause() != null && t.getCause() != t) t = t.getCause();
+        return t;
     }
 
     private static ErrorCode httpStatusToCode(int status) {

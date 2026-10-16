@@ -50,6 +50,9 @@ public final class ErrorCatalog {
         register(ErrorCode.INTERNAL_ERROR,
                 "Ocurrió un error inesperado",
                 "Error interno del servidor. Si persiste, contacta al equipo con el requestId.");
+        register(ErrorCode.DATABASE_UNAVAILABLE,
+                "El servidor está despertando, intenta de nuevo en unos segundos",
+                "La base de datos no respondió a tiempo. Nada se guardó; repite la operación.");
 
         // Auth
         register(ErrorCode.AUTH_INVALID_CREDENTIALS,
