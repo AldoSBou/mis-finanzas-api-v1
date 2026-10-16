@@ -25,6 +25,10 @@ public class User extends PanacheEntityBase {
     @Column(name = "currency_default", nullable = false, length = 3)
     public String currencyDefault = "PEN";
 
+    /** Día en que empieza "su mes" (el día de pago). Nulo = mes calendario. */
+    @Column(name = "period_start_day")
+    public Integer periodStartDay;
+
     @Column(name = "created_at", nullable = false)
     public Instant createdAt = Instant.now();
 

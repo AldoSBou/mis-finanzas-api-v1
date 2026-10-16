@@ -129,6 +129,15 @@ public class AuthService {
         return tokensFor(user, true);
     }
 
+    @Transactional
+    public UserResponse updateProfile(Long userId, ProfileRequest req) {
+        User user = User.findById(userId);
+        if (user == null) throw new ApiException(ErrorCode.AUTH_TOKEN_INVALID);
+        if (req.displayName() != null) user.displayName = req.displayName().trim();
+        if (req.periodStartDay() != null) user.periodStartDay = req.periodStartDay() == 0 ? null : req.periodStartDay();
+        return Mappers.toUserResponse(user);
+    }
+
     private TokenResponse tokensFor(User user, boolean rememberDevice) {
         String token = jwtIssuer.issueFor(user);
         String refresh = rememberDevice ? refreshTokens.issue(user.id) : null;

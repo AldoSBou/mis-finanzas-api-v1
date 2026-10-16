@@ -51,6 +51,10 @@ public enum ErrorCode {
     // Tarjetas
     CARD_INVALID(400),
 
+    // Compromisos
+    COMMITMENT_NOT_FOUND(404),
+    COMMITMENT_INVALID(400),
+
     // Reglas
     RULE_NOT_FOUND(404),
     RULE_TEMPLATE_LOCKED(400),

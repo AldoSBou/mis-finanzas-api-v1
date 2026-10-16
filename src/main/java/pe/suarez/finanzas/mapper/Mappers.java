@@ -18,7 +18,7 @@ public final class Mappers {
     private Mappers() {}
 
     public static AuthDtos.UserResponse toUserResponse(User u) {
-        return new AuthDtos.UserResponse(u.id, u.email, u.displayName, u.currencyDefault);
+        return new AuthDtos.UserResponse(u.id, u.email, u.displayName, u.currencyDefault, u.periodStartDay);
     }
 
     public static CategoryDtos.CategoryResponse toCategoryResponse(Category c) {

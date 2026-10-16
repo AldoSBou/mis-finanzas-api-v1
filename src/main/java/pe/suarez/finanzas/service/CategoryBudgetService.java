@@ -16,6 +16,7 @@ import pe.suarez.finanzas.security.UserContext;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -33,12 +34,21 @@ public class CategoryBudgetService {
 
     /** Todas las categorías de gasto activas, con límite (si tiene) y lo gastado en el mes. */
     public CategoryBudgetSummary summary(YearMonth ym) {
+        return summary(ym.atDay(1), ym.atEndOfMonth());
+    }
+
+    /**
+     * Igual, para un rango de fechas (el periodo del usuario, que puede ir de día de pago a
+     * día de pago). Lo programado solo se calcula si el rango incluye hoy.
+     */
+    public CategoryBudgetSummary summary(LocalDate from, LocalDate to) {
         Long uid = userContext.userId();
+        YearMonth ym = YearMonth.from(to);
         List<Category> categories = catRepo.listByType(uid, TransactionType.EXPENSE);
         Map<Long, BigDecimal> limits = CategoryBudget.<CategoryBudget>list("userId", uid).stream()
                 .collect(Collectors.toMap(b -> b.categoryId, b -> b.amount));
-        Map<Long, BigDecimal> spent = txRepo.sumExpensesByCategory(uid, ym.atDay(1), ym.atEndOfMonth());
-        Map<Long, BigDecimal> scheduled = scheduledByCategory(uid, ym);
+        Map<Long, BigDecimal> spent = txRepo.sumExpensesByCategory(uid, from, to);
+        Map<Long, BigDecimal> scheduled = scheduledByCategory(uid, from, to);
 
         List<CategoryBudgetItem> items = new ArrayList<>();
         BigDecimal totalLimit = BigDecimal.ZERO;
@@ -111,11 +121,12 @@ public class CategoryBudgetService {
                 limit, spent, scheduled, pct, status, willExceed);
     }
 
-    /** Gastos recurrentes que faltan en el mes actual, por categoría (vacío en otros meses). */
-    private Map<Long, BigDecimal> scheduledByCategory(Long uid, YearMonth ym) {
+    /** Gastos recurrentes que faltan hasta {@code to}, por categoría (vacío si el rango no incluye hoy). */
+    private Map<Long, BigDecimal> scheduledByCategory(Long uid, LocalDate from, LocalDate to) {
         Map<Long, BigDecimal> result = new HashMap<>();
-        if (!ym.equals(YearMonth.now())) return result;
-        for (UpcomingItem u : recurringService.upcoming(uid, ym.atEndOfMonth())) {
+        LocalDate today = LocalDate.now();
+        if (today.isBefore(from) || today.isAfter(to)) return result;
+        for (UpcomingItem u : recurringService.upcoming(uid, to)) {
             if (u.type() == TransactionType.EXPENSE && u.categoryId() != null) {
                 result.merge(u.categoryId(), u.amountBase(), BigDecimal::add);
             }

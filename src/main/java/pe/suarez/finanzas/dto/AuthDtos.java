@@ -1,6 +1,8 @@
 package pe.suarez.finanzas.dto;
 
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -45,6 +47,14 @@ public final class AuthDtos {
             Long id,
             String email,
             String displayName,
-            String currencyDefault
+            String currencyDefault,
+            /** Día de inicio del periodo (día de pago); null = mes calendario */
+            Integer periodStartDay
+    ) {}
+
+    /** Cambios de perfil: solo lo que viene se actualiza; {@code periodStartDay} 0 vuelve al mes calendario. */
+    public record ProfileRequest(
+            @Size(max = 80) String displayName,
+            @Min(0) @Max(28) Integer periodStartDay
     ) {}
 }

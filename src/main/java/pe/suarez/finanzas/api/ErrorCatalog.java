@@ -126,6 +126,14 @@ public final class ErrorCatalog {
                 "Operación no válida para la meta",
                 "Revisa el detalle: monto, cuenta o saldo disponible.");
 
+        // Compromisos
+        register(ErrorCode.COMMITMENT_NOT_FOUND,
+                "Compromiso no encontrado",
+                "El compromiso especificado no existe o no pertenece al usuario actual.");
+        register(ErrorCode.COMMITMENT_INVALID,
+                "Operación no válida para el compromiso",
+                "Revisa el detalle: categoría, cuenta o estado del compromiso.");
+
         // Tarjetas
         register(ErrorCode.CARD_INVALID,
                 "Operación no válida para la tarjeta",

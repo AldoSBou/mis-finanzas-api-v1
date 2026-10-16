@@ -97,6 +97,11 @@ Flyway aplicará las migraciones automáticamente.
 | `GET` | `/api/budgets?period=2026-04` | Presupuesto del mes |
 | `POST` | `/api/budgets` | Upsert presupuesto del mes |
 | `GET` | `/api/dashboard?period=2026-04` | **Resumen completo del panel principal** |
+| `PUT` | `/api/auth/me` | Nombre y día de inicio del periodo (día de pago; 0 = mes calendario) |
+| `GET` | `/api/overview` | **"Te quedan S/ X"**: ingreso esperado − gastado − ahorro − compromisos pendientes, con días que faltan y categorías |
+| `GET/POST` | `/api/commitments` | Compromisos de pago (alquiler, colegio, deuda de tarjeta...) |
+| `PUT/DELETE` | `/api/commitments/{id}` | Editar / eliminar |
+| `POST` | `/api/commitments/{id}/pay` · `/skip` · `/reopen` | Pagar (registra el gasto o el "mover dinero"), omitir o reabrir |
 | `POST` | `/api/metrics/events` | Lote de eventos de la app móvil: cuánto tardó cada registro (ENTRY) y errores vistos (ERROR) |
 | `GET` | `/api/metrics/summary?days=30` | Velocidad de registro de la persona: mediana, % en menos de 10 s, errores |
 

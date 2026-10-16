@@ -62,6 +62,14 @@ public class AuthResource {
         return Mappers.toUserResponse(u);
     }
 
+    /** Cambia nombre o día de inicio del periodo (día de pago). */
+    @PUT
+    @Path("/me")
+    @Authenticated
+    public UserResponse updateMe(@Valid ProfileRequest req) {
+        return authService.updateProfile(userContext.userId(), req);
+    }
+
     /**
      * Cierra la sesión del token actual. El token se agrega al denylist
      * y deja de ser válido aunque no haya expirado.
