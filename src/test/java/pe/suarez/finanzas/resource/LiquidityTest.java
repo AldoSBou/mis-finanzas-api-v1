@@ -71,7 +71,7 @@ class LiquidityTest {
                 .body("data.currencies[0].dailyVariable", money("100"))
                 .body("data.currencies[0].days[3].balance", money("120"))
                 .body("data.currencies[0].firstNegative", notNullValue())
-                .body("data.currencies[0].lowest.balance", lessThan(java.math.BigDecimal.ZERO));
+                .body("data.currencies[0].lowest.balance", moneyBelow("0"));
     }
 
     @Test

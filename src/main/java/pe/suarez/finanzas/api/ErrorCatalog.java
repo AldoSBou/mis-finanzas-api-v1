@@ -142,6 +142,13 @@ public final class ErrorCatalog {
                 "Intérprete de voz no disponible",
                 "El servidor no tiene configurado el intérprete o no respondió. Elige la categoría a mano.");
 
+        register(ErrorCode.RECEIPT_NOT_FOUND,
+                "Boleta no encontrada",
+                "La boleta no existe o no pertenece al usuario.");
+        register(ErrorCode.RECEIPT_INVALID,
+                "Boleta no válida",
+                "Revisa el detalle: los grupos deben sumar el total y las categorías ser de gasto.");
+
         // Tarjetas
         register(ErrorCode.CARD_INVALID,
                 "Operación no válida para la tarjeta",

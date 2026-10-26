@@ -88,44 +88,49 @@ public class VoiceService {
 
     /** Foto o captura de pantalla (JPEG/PNG/WEBP en base64, ya reducida por el teléfono). */
     public VoiceParseResponse parseImage(ImageParseRequest req) {
-        Base64ImageSource.MediaType mediaType = switch (req.mediaType() == null ? "" : req.mediaType().toLowerCase()) {
-            case "image/png" -> Base64ImageSource.MediaType.IMAGE_PNG;
-            case "image/webp" -> Base64ImageSource.MediaType.IMAGE_WEBP;
-            case "image/gif" -> Base64ImageSource.MediaType.IMAGE_GIF;
-            default -> Base64ImageSource.MediaType.IMAGE_JPEG;
-        };
-        ImageBlockParam image = ImageBlockParam.builder()
-                .source(Base64ImageSource.builder().mediaType(mediaType).data(req.imageBase64()).build())
-                .build();
         return interpret(List.of(
-                ContentBlockParam.ofImage(image),
+                imageBlock(req.imageBase64(), req.mediaType()),
                 ContentBlockParam.ofText(TextBlockParam.builder()
                         .text("Esta es la foto del comprobante. Saca monto total, tipo, categoría, descripción y fecha.")
                         .build())));
     }
 
-    private VoiceParseResponse interpret(List<ContentBlockParam> content) {
-        if (client == null) throw new ApiException(ErrorCode.VOICE_UNAVAILABLE);
-        Long uid = userContext.userId();
-        List<Category> categories = catRepo.list("userId = ?1 AND archived = false ORDER BY type, name", uid);
-        Map<Long, Category> byId = categories.stream().collect(Collectors.toMap(c -> c.id, Function.identity()));
+    /** Bloque de imagen para el modelo a partir del base64 que manda el teléfono. */
+    public static ContentBlockParam imageBlock(String base64, String mediaType) {
+        Base64ImageSource.MediaType mt = switch (mediaType == null ? "" : mediaType.toLowerCase()) {
+            case "image/png" -> Base64ImageSource.MediaType.IMAGE_PNG;
+            case "image/webp" -> Base64ImageSource.MediaType.IMAGE_WEBP;
+            case "image/gif" -> Base64ImageSource.MediaType.IMAGE_GIF;
+            default -> Base64ImageSource.MediaType.IMAGE_JPEG;
+        };
+        return ContentBlockParam.ofImage(ImageBlockParam.builder()
+                .source(Base64ImageSource.builder().mediaType(mt).data(base64).build())
+                .build());
+    }
 
-        String list = categories.stream()
+    /** Lista "id = nombre (gasto|ingreso)" con las categorías activas del usuario, para el prompt. */
+    public static String categoryList(List<Category> categories) {
+        return categories.stream()
                 .map(c -> c.id + " = " + c.name + " (" + (c.type == TransactionType.INCOME ? "ingreso" : "gasto") + ")")
                 .collect(Collectors.joining("\n"));
+    }
 
-        StructuredMessageCreateParams<Parsed> params = MessageCreateParams.builder()
+    /**
+     * Pregunta al modelo con salida estructurada. Lo usan el intérprete de frases/vouchers y el
+     * lector de boletas. Traduce cualquier fallo del proveedor a VOICE_UNAVAILABLE.
+     */
+    public <T> T ask(String system, Class<T> schema, long maxTokens, String context, List<ContentBlockParam> content) {
+        if (client == null) throw new ApiException(ErrorCode.VOICE_UNAVAILABLE);
+        StructuredMessageCreateParams<T> params = MessageCreateParams.builder()
                 .model(model)
-                .maxTokens(1024L)
-                .system(SYSTEM)
-                .outputConfig(Parsed.class)
-                .addUserMessage("Categorías:\n" + list)
+                .maxTokens(maxTokens)
+                .system(system)
+                .outputConfig(schema)
+                .addUserMessage(context)
                 .addUserMessageOfBlockParams(content)
                 .build();
-
-        Parsed parsed;
         try {
-            parsed = client.messages().create(params).content().stream()
+            return client.messages().create(params).content().stream()
                     .flatMap(cb -> cb.text().stream())
                     .map(t -> t.text())
                     .findFirst()
@@ -134,6 +139,15 @@ public class VoiceService {
             LOG.warnf("Intérprete falló: %s", e.getMessage());
             throw new ApiException(ErrorCode.VOICE_UNAVAILABLE, "El intérprete no está disponible ahora");
         }
+    }
+
+    private VoiceParseResponse interpret(List<ContentBlockParam> content) {
+        if (client == null) throw new ApiException(ErrorCode.VOICE_UNAVAILABLE);
+        Long uid = userContext.userId();
+        List<Category> categories = catRepo.list("userId = ?1 AND archived = false ORDER BY type, name", uid);
+        Map<Long, Category> byId = categories.stream().collect(Collectors.toMap(c -> c.id, Function.identity()));
+
+        Parsed parsed = ask(SYSTEM, Parsed.class, 1024L, "Categorías:\n" + categoryList(categories), content);
 
         // Nunca confiar a ciegas: la categoría tiene que ser de la persona y el tipo, coherente
         Category cat = parsed.categoryId() != null ? byId.get(parsed.categoryId()) : null;

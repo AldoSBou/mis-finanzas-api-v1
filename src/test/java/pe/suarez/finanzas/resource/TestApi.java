@@ -61,6 +61,22 @@ final class TestApi {
         };
     }
 
+    /** Monto estrictamente menor que {@code limit}, sea cual sea el tipo numérico con que llegue el JSON. */
+    static Matcher<Object> moneyBelow(String limit) {
+        BigDecimal max = new BigDecimal(limit);
+        return new TypeSafeMatcher<>() {
+            @Override
+            protected boolean matchesSafely(Object actual) {
+                return actual instanceof Number && new BigDecimal(actual.toString()).compareTo(max) < 0;
+            }
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("monto menor que ").appendValue(max);
+            }
+        };
+    }
+
     static RequestSpecification as(String token) {
         return given().auth().oauth2(token).contentType("application/json");
     }

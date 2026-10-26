@@ -73,6 +73,10 @@ public class Transaction extends PanacheEntityBase {
     @Column(name = "payment_method", length = 40)
     public String paymentMethod;
 
+    /** Boleta leída de una foto que generó este movimiento (uno por categoría), si aplica. */
+    @Column(name = "receipt_id")
+    public Long receiptId;
+
     /** Moneda de la cuenta origen (denormalizada para consultas). */
     @Column(nullable = false, length = 3)
     public String currency = "PEN";

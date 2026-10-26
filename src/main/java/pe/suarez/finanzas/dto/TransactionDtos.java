@@ -54,6 +54,8 @@ public final class TransactionDtos {
             String description,
             String paymentMethod,
             Long recurringId,
+            /** Boleta de la que salió (una boleta genera un movimiento por categoría) */
+            Long receiptId,
             Instant createdAt
     ) {}
 

@@ -60,6 +60,10 @@ public enum ErrorCode {
     // Voz
     VOICE_UNAVAILABLE(503),
 
+    // Boletas
+    RECEIPT_NOT_FOUND(404),
+    RECEIPT_INVALID(400),
+
     // Reglas
     RULE_NOT_FOUND(404),
     RULE_TEMPLATE_LOCKED(400),
