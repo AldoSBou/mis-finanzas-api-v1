@@ -79,8 +79,18 @@ public class ReceiptService {
                         : "Esta es la boleta. Lista todas las líneas de producto con su categoría.")
                 .build()));
 
-        ParsedReceipt parsed = voice.ask(SYSTEM, ParsedReceipt.class, 4096L,
-                "Categorías de gasto:\n" + VoiceService.categoryList(categories), content);
+        // Lo que la persona ya clasificó en boletas anteriores: va al prompt como ejemplos y,
+        // si el producto se repite igual, manda sobre lo que diga el modelo.
+        Map<String, Long> learned = learnedCategories(uid, byId);
+        StringBuilder context = new StringBuilder("Categorías de gasto:\n").append(VoiceService.categoryList(categories));
+        if (!learned.isEmpty()) {
+            context.append("\n\nAsí clasificó esta persona productos de boletas anteriores (producto → id de categoría). ")
+                    .append("Respeta estas decisiones y úsalas de guía para productos parecidos:\n");
+            learned.entrySet().stream().limit(PROMPT_EXAMPLES)
+                    .forEach(e -> context.append(e.getKey()).append(" → ").append(e.getValue()).append('\n'));
+        }
+
+        ParsedReceipt parsed = voice.ask(SYSTEM, ParsedReceipt.class, 4096L, context.toString(), content);
 
         // Líneas válidas, con categoría verificada (tiene que ser de la persona)
         List<ReceiptItem> items = new ArrayList<>();
@@ -94,6 +104,7 @@ public class ReceiptService {
                 items.add(new ReceiptItem(desc, money(it.amount()), cat != null ? cat.id : null, suggested));
             }
         }
+        items = applyLearned(items, learned);
         if (items.isEmpty()) {
             throw new ApiException(ErrorCode.RECEIPT_INVALID,
                     "No pude leer productos en la imagen. Prueba con una foto más cerca y con buena luz.");
@@ -218,6 +229,53 @@ public class ReceiptService {
         Receipt r = Receipt.find("id = ?1 AND userId = ?2", id, uid).firstResult();
         if (r == null) throw new ApiException(ErrorCode.RECEIPT_NOT_FOUND);
         return r;
+    }
+
+    /** Cuántos ejemplos de clasificaciones anteriores van al prompt (los más recientes). */
+    static final int PROMPT_EXAMPLES = 150;
+    /** Cuántas boletas recientes se miran para aprender. */
+    private static final int LEARN_RECEIPTS = 60;
+
+    /**
+     * Producto (normalizado) → categoría, según las boletas que la persona ya confirmó.
+     * La más reciente manda. Solo categorías que siguen activas.
+     */
+    Map<String, Long> learnedCategories(Long uid, Map<Long, Category> activeById) {
+        List<Receipt> recent = Receipt.find("userId = ?1 ORDER BY createdAt DESC", uid).page(0, LEARN_RECEIPTS).list();
+        Map<String, Long> learned = new LinkedHashMap<>();
+        for (Receipt r : recent) {
+            for (Receipt.Item it : r.items) {
+                if (it.categoryId == null || it.description == null || !activeById.containsKey(it.categoryId)) continue;
+                String key = normalize(it.description);
+                if (key.length() < 3 || key.startsWith("ajuste") || key.startsWith("descuento")) continue;
+                learned.putIfAbsent(key, it.categoryId);
+            }
+        }
+        return learned;
+    }
+
+    /** Si el producto ya se clasificó antes con el mismo nombre, esa categoría manda sobre el modelo. */
+    static List<ReceiptItem> applyLearned(List<ReceiptItem> items, Map<String, Long> learned) {
+        if (learned.isEmpty()) return items;
+        List<ReceiptItem> out = new ArrayList<>(items.size());
+        for (ReceiptItem it : items) {
+            Long known = learned.get(normalize(it.description()));
+            out.add(known != null && !known.equals(it.categoryId())
+                    ? new ReceiptItem(it.description(), it.amount(), known, null)
+                    : it);
+        }
+        return out;
+    }
+
+    /** Minúsculas, sin tildes ni signos, espacios simples: "LCH. GLORIA  EVAP" = "lch gloria evap". */
+    static String normalize(String s) {
+        String t = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase()
+                .replaceAll("[^a-z0-9ñ ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return t;
     }
 
     private static BigDecimal money(double v) {
